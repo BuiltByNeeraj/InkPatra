@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bill Book</title>
+<title>Bill Book - Cheque Style &amp; SQLite Record System</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -11,14 +11,15 @@
   <div class="brand">
     <div class="brand-mark">₹</div>
     <div>
-      <h1>Bill&nbsp;Book</h1>
-      <p class="tagline">Cheque-book style bill issuing, numbered &amp; accountable</p>
+      <h1>Cheque-Style&nbsp;Bill&nbsp;Book</h1>
+      <p class="tagline">Cheque-leaf billing with GST calculation &amp; in-memory SQLite record system</p>
     </div>
   </div>
   <nav class="tabs">
     <button class="tab active" data-view="book">Book</button>
     <button class="tab" data-view="register">Register</button>
-    <button class="tab" data-view="settings">Settings</button>
+    <button class="tab" data-view="sqlitedb">SQLite DB</button>
+    <button class="tab" data-view="settings">Settings / Profile</button>
   </nav>
 </header>
 
@@ -26,32 +27,38 @@
   <!-- ============ BOOK VIEW ============ -->
   <section id="view-book" class="view active">
     <div class="toolbar">
-      <h2>Current Book</h2>
+      <h2>Cheque Book Leaves</h2>
       <div class="toolbar-actions">
-        <button id="btn-print-current" class="btn ghost">Print last bill</button>
-        <button id="btn-issue" class="btn primary">Issue new bill</button>
+        <button id="btn-print-current" class="btn ghost">Print Last Cheque</button>
+        <button id="btn-issue" class="btn primary">Issue New Cheque-Bill</button>
       </div>
     </div>
+    <div id="profile-banner-wrap"></div>
     <div class="book-meta" id="book-meta"></div>
     <div class="stats" id="stats"></div>
     <div class="leaves-wrap">
-      <h3>Leaves</h3>
+      <h3>Cheque Leaves in Current Book</h3>
       <div class="leaves" id="leaves"></div>
-      <p class="hint">Click a leaf to open its printable bill. Grey leaves are unused.</p>
+      <p class="hint">Click any issued cheque leaf to preview or print it. Grey leaves represent unissued cheques.</p>
     </div>
   </section>
 
   <!-- ============ REGISTER VIEW ============ -->
   <section id="view-register" class="view">
     <div class="toolbar">
-      <h2>Bill Register</h2>
+      <h2>Bill &amp; Cheque Register</h2>
       <div class="toolbar-actions">
-        <input id="search" type="search" placeholder="Search payee, memo, number…" />
+        <input id="search" type="search" placeholder="Search payee, memo, number, GSTIN…" />
         <select id="filter-status">
           <option value="">All statuses</option>
           <option value="issued">Issued</option>
           <option value="paid">Paid</option>
           <option value="void">Void</option>
+        </select>
+        <select id="filter-gst">
+          <option value="">All bills</option>
+          <option value="with_gst">With GST</option>
+          <option value="no_gst">Without GST</option>
         </select>
       </div>
     </div>
@@ -59,92 +66,288 @@
       <table id="register-table">
         <thead>
           <tr>
-            <th>Bill No.</th>
+            <th>Cheque No.</th>
             <th>Date</th>
+            <th>Due Date</th>
             <th>Issued to</th>
+            <th>Payee GSTIN</th>
             <th>Memo</th>
-            <th class="num">Amount</th>
+            <th class="num">Taxable Amt</th>
+            <th class="num">GST Amt</th>
+            <th class="num">Total Amount</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="register-body"></tbody>
       </table>
-      <p class="empty" id="register-empty">No bills yet — issue your first one from the Book tab.</p>
+      <p class="empty" id="register-empty">No bills yet — issue your first cheque-bill from the Book tab.</p>
     </div>
   </section>
 
-  <!-- ============ SETTINGS VIEW ============ -->
+  <!-- ============ SQLITE DB VIEW ============ -->
+  <section id="view-sqlitedb" class="view">
+    <div class="toolbar">
+      <div>
+        <h2>In-Memory SQLite Database (<code class="code-badge">:memory:</code>)</h2>
+        <p class="subtitle">All records are maintained using relational SQLite tables in memory with live query execution.</p>
+      </div>
+      <div class="toolbar-actions">
+        <button type="button" id="btn-db-export-sql" class="btn ghost">Export .SQL Dump</button>
+        <button type="button" id="btn-db-import-sql" class="btn ghost">Import .SQL Script</button>
+        <input id="file-db-import-sql" type="file" accept=".sql,text/plain" hidden />
+      </div>
+    </div>
+
+    <!-- DB Stats Cards -->
+    <div class="stats" id="db-stats">
+      <div class="stat">
+        <div class="label">Engine &amp; Mode</div>
+        <div class="value db-active-badge">SQLite (:memory:)</div>
+      </div>
+      <div class="stat">
+        <div class="label">Bills Table Rows</div>
+        <div class="value" id="db-stat-bills-count">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Settings Record</div>
+        <div class="value" id="db-stat-settings-status">Configured</div>
+      </div>
+      <div class="stat">
+        <div class="label">Queries Executed</div>
+        <div class="value" id="db-stat-queries-count">0</div>
+      </div>
+    </div>
+
+    <!-- SQL Console Card -->
+    <div class="card form sql-console-card">
+      <h3>Interactive SQLite Console</h3>
+      <p class="hint">Execute arbitrary SQL queries against the in-memory database.</p>
+      <div class="sql-shortcuts">
+        <span>Quick Queries:</span>
+        <button type="button" class="btn small ghost btn-quick-sql" data-sql="SELECT * FROM bills ORDER BY number ASC;">All Bills</button>
+        <button type="button" class="btn small ghost btn-quick-sql" data-sql="SELECT * FROM settings;">Settings</button>
+        <button type="button" class="btn small ghost btn-quick-sql" data-sql="SELECT status, COUNT(*), SUM(amount) FROM bills GROUP BY status;">Status Breakdown</button>
+        <button type="button" class="btn small ghost btn-quick-sql" data-sql="SELECT number, payee, base_amount, gst_rate, amount FROM bills WHERE gst_rate > 0;">GST Bills</button>
+      </div>
+      <div class="sql-input-wrap">
+        <textarea id="sql-query-input" rows="3" spellcheck="false" placeholder="Enter SQL query, e.g.: SELECT * FROM bills WHERE status='issued';">SELECT * FROM bills ORDER BY number ASC;</textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="btn-run-sql" class="btn primary">Run SQL Query</button>
+        <button type="button" id="btn-clear-sql-output" class="btn ghost">Clear Output</button>
+      </div>
+      <div id="sql-console-feedback" class="sql-feedback"></div>
+      <div class="table-wrap sql-output-wrap" id="sql-output-wrap" style="display: none;">
+        <table id="sql-result-table">
+          <thead id="sql-result-head"></thead>
+          <tbody id="sql-result-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Real-Time Query Execution Log -->
+    <div class="card form sql-log-card">
+      <div class="sql-log-head">
+        <h3>Live SQLite Query Execution Log</h3>
+        <span class="hint">Real-time log of SQL queries run by this application</span>
+      </div>
+      <div class="sql-log-stream" id="sql-log-stream"></div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS & PROFILE VIEW ============ -->
   <section id="view-settings" class="view">
-    <h2>Settings</h2>
+    <h2>Business Profile &amp; Settings</h2>
     <form id="form-settings" class="card form">
-      <label>Book name / your name
-        <input id="set-bookname" type="text" placeholder="e.g. R. Sharma" />
-      </label>
-      <label>Address line
-        <input id="set-address" type="text" placeholder="e.g. 12 MG Road, Pune" />
-      </label>
-      <label>Currency symbol
-        <input id="set-currency" type="text" maxlength="4" placeholder="₹" />
-      </label>
       <fieldset>
-        <legend>Book range (cheque-book style serials)</legend>
+        <legend>Business / Personal Profile (Printed on Cheques)</legend>
+        <label>Firm / Issuer Name
+          <input id="set-bookname" type="text" placeholder="e.g. Sharma Enterprises or Rajesh Sharma" />
+        </label>
+        <label>Address line
+          <input id="set-address" type="text" placeholder="e.g. 12 MG Road, Pune, Maharashtra - 411001" />
+        </label>
         <div class="row">
-          <label>From
+          <label>Business GSTIN (Tax Identification)
+            <input id="set-gstin" type="text" maxlength="15" placeholder="e.g. 27AAAAA0000A1Z5" style="text-transform: uppercase;" />
+          </label>
+          <label>Currency Symbol
+            <input id="set-currency" type="text" maxlength="4" placeholder="₹" />
+          </label>
+        </div>
+        <label>Legal Jurisdiction / Area Notice (Printed on Cheque)
+          <input id="set-legal-line" type="text" placeholder="e.g. Subject to Pune District Jurisdiction only" />
+          <p class="hint">Customize the legal jurisdiction line for your district / area.</p>
+        </label>
+        <label>Company Watermark Logo (Center of Cheque)
+          <div class="logo-setting-wrap">
+            <input id="set-logo-file" type="file" accept="image/*" />
+            <input id="set-logo-url" type="hidden" />
+            <div id="logo-preview-wrap" style="display:none; margin-top:8px; align-items:center; gap:10px;">
+              <img id="logo-preview-img" alt="Logo Preview" style="max-height:48px; max-width:140px; border:1px solid #ccc; padding:3px; border-radius:4px; background:#fff;" />
+              <button type="button" id="btn-remove-logo" class="btn small danger ghost">Remove Custom Logo</button>
+            </div>
+            <p class="hint">Upload a logo to appear as a subtle central watermark. If left blank, an elegant bank crest watermark is generated automatically.</p>
+          </div>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>GST Defaults for New Bills</legend>
+        <div class="row">
+          <label>Default GST Rate (%)
+            <select id="set-default-gst-rate">
+              <option value="0">0% (Nil / Exempt)</option>
+              <option value="5">5% GST</option>
+              <option value="12">12% GST</option>
+              <option value="18" selected>18% GST (Standard)</option>
+              <option value="28">28% GST</option>
+            </select>
+          </label>
+          <label>Default Tax Split
+            <select id="set-default-gst-type">
+              <option value="cgst_sgst" selected>Intra-State: CGST + SGST (50/50)</option>
+              <option value="igst">Inter-State: IGST (Full)</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Cheque Book Range (Numbered Serials)</legend>
+        <div class="row">
+          <label>From Leaf No.
             <input id="set-from" type="number" min="1" step="1" />
           </label>
-          <label>To
+          <label>To Leaf No.
             <input id="set-to" type="number" min="1" step="1" />
           </label>
         </div>
-        <p class="hint">Changing the range only affects <em>unused</em> leaves. Issued bills keep their numbers.</p>
+        <p class="hint">Changing the range only affects unissued leaves. Previously issued cheques retain their serial numbers.</p>
       </fieldset>
+
       <div class="form-actions">
-        <button type="submit" class="btn primary">Save settings</button>
-        <button type="button" id="btn-export" class="btn ghost">Export data (JSON)</button>
-        <button type="button" id="btn-import" class="btn ghost">Import data</button>
-        <input id="file-import" type="file" accept="application/json" hidden />
-        <button type="button" id="btn-reset" class="btn danger ghost">Reset everything</button>
+        <button type="submit" class="btn primary">Save Profile &amp; Settings</button>
+        <button type="button" id="btn-export-json" class="btn ghost">Export Data (JSON)</button>
+        <button type="button" id="btn-export-sql-settings" class="btn ghost">Export SQLite (.sql)</button>
+        <button type="button" id="btn-import-data" class="btn ghost">Import Data / Script</button>
+        <input id="file-general-import" type="file" accept="application/json,.sql,text/plain" hidden />
+        <button type="button" id="btn-reset" class="btn danger ghost">Reset Everything</button>
       </div>
     </form>
   </section>
 </main>
 
-<!-- ============ MODAL: ISSUE ============ -->
+<!-- ============ MODAL: ISSUE CHEQUE-BILL ============ -->
 <div class="overlay" id="overlay" hidden>
-  <div class="modal" role="dialog" aria-modal="true">
-    <h3 id="modal-title">Issue bill</h3>
+  <div class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <h3 id="modal-title">Issue New Cheque-Bill</h3>
+      <button type="button" class="btn-close" id="btn-close-modal" aria-label="Close dialog">&times;</button>
+    </div>
     <form id="form-issue" class="form">
       <div class="row">
-        <label>Bill no.
-          <input id="f-number" type="text" readonly />
+        <label style="flex: 1;">Cheque / Bill No.
+          <input id="f-number" type="text" readonly class="readonly-input" />
         </label>
-        <label>Date
+        <label style="flex: 1;">Cheque Date (Issue Date) *
           <input id="f-date" type="date" required />
         </label>
+        <label style="flex: 1;">Due Date (Payment Due) *
+          <input id="f-due-date" type="date" required />
+        </label>
       </div>
-      <label>Issued to
-        <input id="f-payee" type="text" required placeholder="Name of person / firm" />
+
+      <div class="row">
+        <label style="flex: 2;">Payee (Issued to) *
+          <input id="f-payee" type="text" required placeholder="Person or Company Name" />
+        </label>
+        <label style="flex: 1;">Payee GSTIN (Optional)
+          <input id="f-payee-gstin" type="text" maxlength="15" placeholder="e.g. 27ABCDE1234F1Z5" style="text-transform: uppercase;" />
+        </label>
+      </div>
+
+      <!-- GST Section -->
+      <div class="gst-box">
+        <div class="gst-toggle-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="f-apply-gst" checked />
+            <strong>Apply GST to this bill</strong>
+          </label>
+        </div>
+
+        <div id="gst-fields-row" class="row">
+          <label>Base / Taxable Amount (<span class="currency-label">₹</span>) *
+            <input id="f-base-amount" type="number" min="0.01" step="0.01" required placeholder="0.00" />
+          </label>
+          <label>GST Rate
+            <select id="f-gst-rate">
+              <option value="0">0% (Nil)</option>
+              <option value="5">5%</option>
+              <option value="12">12%</option>
+              <option value="18" selected>18%</option>
+              <option value="28">28%</option>
+              <option value="custom">Custom Rate</option>
+            </select>
+          </label>
+          <label id="f-custom-rate-wrap" style="display: none;">Custom %
+            <input id="f-custom-rate" type="number" min="0" max="100" step="0.1" placeholder="e.g. 7.5" />
+          </label>
+          <label>GST Type
+            <select id="f-gst-type">
+              <option value="cgst_sgst" selected>Intra-State (CGST + SGST)</option>
+              <option value="igst">Inter-State (IGST)</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Live Tax Calculation Breakdown -->
+        <div class="tax-calculation-card" id="tax-calc-card">
+          <div class="tax-row">
+            <span>Taxable Value:</span>
+            <strong id="calc-taxable-val">₹ 0.00</strong>
+          </div>
+          <div class="tax-row" id="calc-cgst-row">
+            <span id="calc-cgst-lbl">CGST (9%):</span>
+            <span id="calc-cgst-val">₹ 0.00</span>
+          </div>
+          <div class="tax-row" id="calc-sgst-row">
+            <span id="calc-sgst-lbl">SGST (9%):</span>
+            <span id="calc-sgst-val">₹ 0.00</span>
+          </div>
+          <div class="tax-row" id="calc-igst-row" style="display: none;">
+            <span id="calc-igst-lbl">IGST (18%):</span>
+            <span id="calc-igst-val">₹ 0.00</span>
+          </div>
+          <div class="tax-row total-row">
+            <span>Total Cheque Amount:</span>
+            <strong id="calc-grand-total">₹ 0.00</strong>
+          </div>
+          <div class="amount-words-preview" id="calc-amount-words">Zero Rupees Only</div>
+        </div>
+      </div>
+
+      <label>Memo / Description (Being payment of)
+        <input id="f-memo" type="text" placeholder="e.g. Consultancy Services, Office Supplies, Order #1042" />
       </label>
-      <label>Amount
-        <input id="f-amount" type="number" min="0.01" step="0.01" required placeholder="0.00" />
-      </label>
-      <label>Memo
-        <input id="f-memo" type="text" placeholder="What is this bill for?" />
-      </label>
+
       <div class="form-actions">
         <button type="button" class="btn ghost" id="btn-cancel">Cancel</button>
-        <button type="submit" class="btn primary">Issue</button>
+        <button type="submit" class="btn primary">Issue &amp; Print Cheque</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- ============ PRINTABLE BILL ============ -->
+<!-- ============ REAL CHEQUE PRINT AREA ============ -->
 <div class="print-area" id="print-area" hidden></div>
 
-<footer class="footer">Data is stored locally in your browser. Use Settings → Export to back it up.</footer>
+<footer class="footer">
+  Cheque-Style Bill Book &nbsp;·&nbsp; In-Memory SQLite Engine &nbsp;·&nbsp; Data stored in memory &amp; backed up locally.
+</footer>
 
+<script src="sqlite-engine.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
