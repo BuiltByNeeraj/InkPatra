@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bill Book</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">₹</div>
+    <div>
+      <h1>Bill&nbsp;Book</h1>
+      <p class="tagline">Cheque-book style bill issuing, numbered &amp; accountable</p>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-view="book">Book</button>
+    <button class="tab" data-view="register">Register</button>
+    <button class="tab" data-view="settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ BOOK VIEW ============ -->
+  <section id="view-book" class="view active">
+    <div class="toolbar">
+      <h2>Current Book</h2>
+      <div class="toolbar-actions">
+        <button id="btn-print-current" class="btn ghost">Print last bill</button>
+        <button id="btn-issue" class="btn primary">Issue new bill</button>
+      </div>
+    </div>
+    <div class="book-meta" id="book-meta"></div>
+    <div class="stats" id="stats"></div>
+    <div class="leaves-wrap">
+      <h3>Leaves</h3>
+      <div class="leaves" id="leaves"></div>
+      <p class="hint">Click a leaf to open its printable bill. Grey leaves are unused.</p>
+    </div>
+  </section>
+
+  <!-- ============ REGISTER VIEW ============ -->
+  <section id="view-register" class="view">
+    <div class="toolbar">
+      <h2>Bill Register</h2>
+      <div class="toolbar-actions">
+        <input id="search" type="search" placeholder="Search payee, memo, number…" />
+        <select id="filter-status">
+          <option value="">All statuses</option>
+          <option value="issued">Issued</option>
+          <option value="paid">Paid</option>
+          <option value="void">Void</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="register-table">
+        <thead>
+          <tr>
+            <th>Bill No.</th>
+            <th>Date</th>
+            <th>Issued to</th>
+            <th>Memo</th>
+            <th class="num">Amount</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="register-body"></tbody>
+      </table>
+      <p class="empty" id="register-empty">No bills yet — issue your first one from the Book tab.</p>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS VIEW ============ -->
+  <section id="view-settings" class="view">
+    <h2>Settings</h2>
+    <form id="form-settings" class="card form">
+      <label>Book name / your name
+        <input id="set-bookname" type="text" placeholder="e.g. R. Sharma" />
+      </label>
+      <label>Address line
+        <input id="set-address" type="text" placeholder="e.g. 12 MG Road, Pune" />
+      </label>
+      <label>Currency symbol
+        <input id="set-currency" type="text" maxlength="4" placeholder="₹" />
+      </label>
+      <fieldset>
+        <legend>Book range (cheque-book style serials)</legend>
+        <div class="row">
+          <label>From
+            <input id="set-from" type="number" min="1" step="1" />
+          </label>
+          <label>To
+            <input id="set-to" type="number" min="1" step="1" />
+          </label>
+        </div>
+        <p class="hint">Changing the range only affects <em>unused</em> leaves. Issued bills keep their numbers.</p>
+      </fieldset>
+      <div class="form-actions">
+        <button type="submit" class="btn primary">Save settings</button>
+        <button type="button" id="btn-export" class="btn ghost">Export data (JSON)</button>
+        <button type="button" id="btn-import" class="btn ghost">Import data</button>
+        <input id="file-import" type="file" accept="application/json" hidden />
+        <button type="button" id="btn-reset" class="btn danger ghost">Reset everything</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<!-- ============ MODAL: ISSUE ============ -->
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="modal-title">Issue bill</h3>
+    <form id="form-issue" class="form">
+      <div class="row">
+        <label>Bill no.
+          <input id="f-number" type="text" readonly />
+        </label>
+        <label>Date
+          <input id="f-date" type="date" required />
+        </label>
+      </div>
+      <label>Issued to
+        <input id="f-payee" type="text" required placeholder="Name of person / firm" />
+      </label>
+      <label>Amount
+        <input id="f-amount" type="number" min="0.01" step="0.01" required placeholder="0.00" />
+      </label>
+      <label>Memo
+        <input id="f-memo" type="text" placeholder="What is this bill for?" />
+      </label>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" id="btn-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Issue</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ PRINTABLE BILL ============ -->
+<div class="print-area" id="print-area" hidden></div>
+
+<footer class="footer">Data is stored locally in your browser. Use Settings → Export to back it up.</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
