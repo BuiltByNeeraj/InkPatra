@@ -1,5 +1,20 @@
 "use strict";
 
+// Every mutation waits for the committed server response before rendering success.
+let mutationPending = false;
+function committedAction(handler) {
+  return async (event) => {
+    event.preventDefault();
+    if (mutationPending) return;
+    mutationPending = true;
+    const button = event.submitter || event.target.closest?.('button');
+    if (button) button.disabled = true;
+    try { await handler(event); }
+    catch (error) { alert(error.message + '\nNo successful save is confirmed. Reload to check the database before retrying.'); }
+    finally { mutationPending = false; if (button) button.disabled = false; }
+  };
+}
+
 /**
  * Cheque-Style Bill Book with GST and In-Memory SQLite Record Engine
  */
@@ -278,7 +293,7 @@ function renderRegister() {
   document.getElementById("register-empty").style.display = bills.length ? "none" : "block";
 }
 
-document.getElementById("register-body").addEventListener("click", (e) => {
+document.getElementById("register-body").addEventListener("click", committedAction(async (e) => {
   const btn = e.target.closest("button[data-act]");
   if (!btn) return;
   const n = Number(btn.dataset.n);
@@ -287,19 +302,19 @@ document.getElementById("register-body").addEventListener("click", (e) => {
   if (!bill) return;
 
   if (act === "paid") {
-    db.updateBillStatus(n, "paid");
+    await db.updateBillStatus(n, "paid");
     renderRegister();
     renderBook();
   } else if (act === "void") {
     if (confirm(`Void Cheque No. ${fmtNum(n)}? Like a torn cheque, this serial is permanently cancelled and cannot be re-issued.`)) {
-      db.updateBillStatus(n, "void");
+      await db.updateBillStatus(n, "void");
       renderRegister();
       renderBook();
     }
   } else if (act === "print") {
     openPrint(n);
   }
-});
+}));
 
 document.getElementById("search").addEventListener("input", renderRegister);
 document.getElementById("filter-status").addEventListener("change", renderRegister);
@@ -426,7 +441,7 @@ document.getElementById("btn-issue").addEventListener("click", () => {
   document.getElementById("f-payee").focus();
 });
 
-document.getElementById("form-issue").addEventListener("submit", (e) => {
+document.getElementById("form-issue").addEventListener("submit", committedAction(async (e) => {
   e.preventDefault();
   const n = nextNumber();
   if (n === null) return;
@@ -458,13 +473,13 @@ document.getElementById("form-issue").addEventListener("submit", (e) => {
     issued_at: new Date().toISOString(),
   };
 
-  db.insertBill(bill);
+  const savedBill = await db.insertBill(bill);
   closeModal();
   renderBook();
   renderRegister();
   renderSQLiteView();
-  openPrint(n);
-});
+  openPrint(savedBill.number);
+}));
 
 /* ---------------- Real Cheque Generator ---------------- */
 
@@ -571,7 +586,7 @@ function chequeHTML(b) {
         <!-- Central Watermark (Company Logo or Crest) -->
         <div class="cheque-watermark">
           ${s.logo_url
-            ? `<img src="${s.logo_url}" alt="Watermark Logo" class="watermark-img" />`
+            ? `<img src="${esc(s.logo_url)}" alt="Watermark Logo" class="watermark-img" />`
             : `<div class="watermark-crest">
                 <div class="crest-sym">${esc(s.currency || "₹")}</div>
                 <div class="crest-title">${esc(s.book_name || "BILL BOOK")}</div>
@@ -794,18 +809,19 @@ document.getElementById("btn-clear-sql-output").addEventListener("click", () => 
 });
 
 // Export .SQL dump
-function downloadSQLDump() {
+async function downloadSQLDump() {
+  await db.initialize();
   const sqlDump = db.exportSQL();
   const blob = new Blob([sqlDump], { type: "application/sql" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `billbook-sqlite-memory-${today()}.sql`;
+  a.download = `billbook-sqlite-${today()}.sql`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
 
-document.getElementById("btn-db-export-sql").addEventListener("click", downloadSQLDump);
-document.getElementById("btn-export-sql-settings").addEventListener("click", downloadSQLDump);
+document.getElementById("btn-db-export-sql").addEventListener("click", committedAction(downloadSQLDump));
+document.getElementById("btn-export-sql-settings").addEventListener("click", committedAction(downloadSQLDump));
 
 // Import .SQL script
 function triggerSQLImport() {
@@ -817,18 +833,18 @@ document.getElementById("file-db-import-sql").addEventListener("change", (e) => 
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = committedAction(async () => {
     try {
-      const count = db.importSQL(reader.result);
+      const count = await db.importSQL(reader.result);
       fillSettings();
       renderBook();
       renderRegister();
       renderSQLiteView();
-      alert(`SQLite script executed. ${count} bills imported into memory.`);
+      alert(`SQLite script executed. ${count} bills imported into SQLite.`);
     } catch (err) {
       alert("Error importing SQL script: " + err.message);
     }
-  };
+  });
   reader.readAsText(file);
   e.target.value = "";
 });
@@ -877,7 +893,7 @@ document.getElementById("btn-remove-logo").addEventListener("click", () => {
   document.getElementById("logo-preview-wrap").style.display = "none";
 });
 
-document.getElementById("form-settings").addEventListener("submit", (e) => {
+document.getElementById("form-settings").addEventListener("submit", committedAction(async (e) => {
   e.preventDefault();
   const s = db.getSettings();
   const newFrom = Math.max(1, parseInt(document.getElementById("set-from").value, 10) || s.range_from);
@@ -903,15 +919,16 @@ document.getElementById("form-settings").addEventListener("submit", (e) => {
     logo_url: document.getElementById("set-logo-url").value || "",
   };
 
-  db.saveSettings(updated);
+  await db.saveSettings(updated);
   renderBook();
   renderRegister();
   renderSQLiteView();
-  alert("Profile, legal notice and settings saved in SQLite memory database.");
-});
+  alert("Profile, legal notice and settings saved to SQLite.");
+}));
 
 // JSON Export
-document.getElementById("btn-export-json").addEventListener("click", () => {
+document.getElementById("btn-export-json").addEventListener("click", committedAction(async () => {
+  await db.initialize();
   const data = {
     settings: db.getSettings(),
     bills: db.getBills(),
@@ -923,7 +940,7 @@ document.getElementById("btn-export-json").addEventListener("click", () => {
   a.download = `bill-book-${today()}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-});
+}));
 
 // General Import (JSON or SQL)
 document.getElementById("btn-import-data").addEventListener("click", () => {
@@ -934,11 +951,11 @@ document.getElementById("file-general-import").addEventListener("change", (e) =>
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = committedAction(async () => {
     const text = reader.result;
     try {
       if (file.name.endsWith(".sql") || text.includes("CREATE TABLE") || text.includes("INSERT INTO")) {
-        const count = db.importSQL(text);
+        const count = await db.importSQL(text);
         fillSettings();
         renderBook();
         renderRegister();
@@ -946,31 +963,26 @@ document.getElementById("file-general-import").addEventListener("change", (e) =>
         alert(`SQLite Script imported: ${count} bill record(s) loaded.`);
       } else {
         const parsed = JSON.parse(text);
-        if (parsed.settings) db.saveSettings(parsed.settings);
-        if (Array.isArray(parsed.bills)) {
-          parsed.bills.forEach((b) => db.insertBill(b));
-        } else if (parsed.bills && typeof parsed.bills === "object") {
-          Object.values(parsed.bills).forEach((b) => db.insertBill(b));
-        }
+        await db.importJSON(parsed);
         fillSettings();
         renderBook();
         renderRegister();
         renderSQLiteView();
-        alert("JSON Data successfully imported into SQLite memory.");
+        alert("JSON data committed to SQLite.");
       }
     } catch (err) {
       alert("Could not import file: " + err.message);
     }
-  };
+  });
   reader.readAsText(file);
   e.target.value = "";
 });
 
 // Reset Database
-document.getElementById("btn-reset").addEventListener("click", () => {
-  if (confirm("Delete ALL bills and reset the in-memory SQLite database? This cannot be undone. Please export a backup first.")) {
+document.getElementById("btn-reset").addEventListener("click", committedAction(async (e) => {
+  if (confirm("Delete ALL bills and reset the SQLite database? A verified recovery backup will be created first. Please also export your own backup.")) {
     if (confirm("Are you completely sure?")) {
-      db.resetAll();
+      await db.resetAll();
       fillSettings();
       renderBook();
       renderRegister();
@@ -978,10 +990,23 @@ document.getElementById("btn-reset").addEventListener("click", () => {
       alert("Database reset completed.");
     }
   }
-});
+}));
 
 /* ---------------- Initialization ---------------- */
 
-fillSettings();
-renderBook();
-renderSQLiteView();
+async function initializeApplication() {
+  const surfaces = [document.querySelector('main'), document.querySelector('header')];
+  surfaces.forEach(element => { element.inert = true; });
+  try {
+    await db.initialize();
+    await db.migrateBrowserData();
+    fillSettings();
+    renderBook();
+    renderRegister();
+    renderSQLiteView();
+    surfaces.forEach(element => { element.inert = false; });
+  } catch (error) {
+    alert('Cannot load the local SQLite database. Run python3 server.py and open http://127.0.0.1:8080, then reload. Existing browser data has not been changed.\n' + error.message);
+  }
+}
+initializeApplication();

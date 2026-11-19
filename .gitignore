@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+# Customer data belongs in the user's application data directory.
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+migration-*.json
+bill-book-*.json

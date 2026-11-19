@@ -1,6 +1,6 @@
 # Cheque-Style Bill Book
 
-A browser-based billing application that combines a cheque-book interface with GST calculations, numbered bill records, and printable cheque-style layouts. Built with HTML, CSS, and JavaScript, with no frontend dependencies or build step.
+A browser-based billing application that combines a cheque-book interface with GST calculations, numbered bill records, and printable cheque-style layouts. Built with HTML, CSS, and JavaScript, with a Python + SQLite local backend, no runtime third-party dependencies, and no frontend build step. Linux is the current target platform.
 
 ![Issued cheque-style bill with counterfoil and GST breakdown](docs/screenshots/issued-bill.png)
 
@@ -12,24 +12,27 @@ A browser-based billing application that combines a cheque-book interface with G
 - **Numbered bill book:** Set a serial range, issue bills sequentially, and track issued, paid, and void records.
 - **Searchable register:** Find bills by payee, memo, number, or GSTIN; filter by status and GST applicability.
 - **Payment details:** Record bill dates and payment due dates, and mark bills as paid or void.
-- **Data tools:** Export JSON backups or SQL dumps, import saved data, and inspect records through the built-in SQL-style console.
+- **Persistent local records:** SQLite stores settings and invoices outside the repository and browser profile.
+- **Data tools:** Export JSON or SQL data, import without overwriting invoices, and create verified full SQLite backups with recovery-safe restore. The existing console inspects a read-only browser snapshot.
 - **Print support:** Print a bill through the browser or save it as a PDF using the browser's print dialog.
 
 ## Getting started
 
 ### Run the browser application
 
-Clone the repository and start a local static server using Python 3:
+Use Python 3 on Linux:
 
 ```bash
 git clone https://github.com/BuiltByNeeraj/Cheque-style-bill-book.git
 cd Cheque-style-bill-book
-python3 -m http.server 8080 --bind 127.0.0.1
+python3 server.py 8080
 ```
 
-Open [localhost:8080](http://localhost:8080) in a modern browser. No package installation is required.
+Open **[127.0.0.1:8080](http://127.0.0.1:8080)**. Keep the server running while using the app. Start it again after reboot; saved records remain on disk. No package installation is required.
 
-You can also open `index.html` directly, although browser rules for local-file storage vary. Using a local server gives the application a consistent browser origin.
+The local Python backend is required; direct file opening and static hosting do not support saves. Use `127.0.0.1`, not `localhost`, because the server validates its exact Host and Origin.
+
+For existing browser records, **export JSON from the old app at its original URL first**. Migration is explicit and never clears localStorage. See the [Linux migration, backup, restore, and acceptance guide](docs/linux-local-storage.md).
 
 ### Create your first bill
 
@@ -64,21 +67,17 @@ The issued bill preview appears at the top of this README. All screenshots are s
 
 ## Storage and database behavior
 
-The browser application uses a custom JavaScript relational store in `sqlite-engine.js`. It keeps records in memory and saves business settings and bills to browser `localStorage`. The **SQLite DB** tab provides a limited SQL-style query interface; it does not run a native SQLite engine or support arbitrary SQLite statements.
+The backend uses Python's standard `sqlite3` module and stores the database at:
 
-Data belongs to the browser profile and origin where the application runs. Changing the hostname or port can show a different dataset. Clearing site storage removes saved records. Use JSON or SQL exports for backups and transfers; there is no automatic cloud synchronization.
-
-### Optional Python SQLite server
-
-To serve the application alongside a native SQLite API, run:
-
-```bash
-python3 server.py 8080
+```text
+${XDG_DATA_HOME:-$HOME/.local/share}/cheque-style-bill-book/billbook.sqlite3
 ```
 
-The server uses only Python's standard library and creates a SQLite database with `sqlite3.connect(":memory:")`. Its API includes settings, bills, SQL execution, and SQL export endpoints.
+Invoice numbering and inserts are committed together. Duplicate and voided numbers cannot be overwritten. Imports are atomic and reject conflicts. GST calculations and the cheque template retain their existing behavior and layout.
 
-**The current frontend does not call these API endpoints.** Browser records and server records are separate, and the server database is lost when its process stops. The bundled server listens on all network interfaces and is intended for local development; it has no authentication.
+Browser localStorage is used only as an explicitly approved migration source. It is never modified by the new application. JSON exports remain available; full SQLite backup/restore commands verify integrity and preserve a recovery backup before restoration. Read the [operations guide](docs/linux-local-storage.md) before migrating or restoring customer data.
+
+The server listens only on `127.0.0.1`, validates Host and Origin, requires CSRF protection on writes, and exposes no SQL execution API. The SQLite DB console queries the loaded browser snapshot only.
 
 ## Project structure
 
@@ -87,10 +86,13 @@ Cheque-style-bill-book/
 ├── index.html          # Application views, forms, and dialogs
 ├── styles.css          # Interface, cheque layout, and print styles
 ├── app.js              # Billing workflow, GST calculations, and rendering
-├── sqlite-engine.js    # Browser data store, query support, and SQL import/export
-├── server.py           # Optional HTTP server and in-memory SQLite API
+├── sqlite-engine.js    # Backend adapter, snapshot query support, and SQL export
+├── server.py           # Protected loopback HTTP server and operations CLI
+├── storage.py          # Transactional SQLite persistence, import, backup, restore
+├── tests/              # Persistence, security, frontend, GST, and browser tests
 ├── docs/
-│   └── screenshots/    # Application screenshots used in this README
+│   ├── screenshots/    # Application screenshots used in this README
+│   └── linux-local-storage.md # Migration, operations, and acceptance guide
 └── README.md
 ```
 
@@ -100,9 +102,18 @@ Cheque-style-bill-book/
 | --- | --- |
 | Interface | HTML5 and CSS3 |
 | Application logic | Vanilla JavaScript |
-| Browser persistence | Local storage |
-| Optional backend | Python 3 standard library: `http.server` and `sqlite3` |
+| Persistence | File-backed SQLite in the Linux application data directory |
+| Local backend | Python 3 standard library: `http.server` and `sqlite3` |
 | Printing | Browser print dialog and print-specific CSS |
+
+## Verification
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+node tests/frontend.test.js
+```
+
+Node.js is needed only for frontend tests. Optional Chromium integration checks and manual acceptance steps are documented in the [Linux guide](docs/linux-local-storage.md).
 
 ## Contributing
 

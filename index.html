@@ -12,7 +12,7 @@
     <div class="brand-mark">₹</div>
     <div>
       <h1>Cheque-Style&nbsp;Bill&nbsp;Book</h1>
-      <p class="tagline">Cheque-leaf billing with GST calculation &amp; in-memory SQLite record system</p>
+      <p class="tagline">Cheque-leaf billing with GST calculation &amp; local SQLite record system</p>
     </div>
   </div>
   <nav class="tabs">
@@ -89,8 +89,8 @@
   <section id="view-sqlitedb" class="view">
     <div class="toolbar">
       <div>
-        <h2>In-Memory SQLite Database (<code class="code-badge">:memory:</code>)</h2>
-        <p class="subtitle">All records are maintained using relational SQLite tables in memory with live query execution.</p>
+        <h2>Local SQLite Database (<code class="code-badge">disk</code>)</h2>
+        <p class="subtitle">Records are committed to the local SQLite database. The console inspects the loaded browser snapshot.</p>
       </div>
       <div class="toolbar-actions">
         <button type="button" id="btn-db-export-sql" class="btn ghost">Export .SQL Dump</button>
@@ -103,7 +103,7 @@
     <div class="stats" id="db-stats">
       <div class="stat">
         <div class="label">Engine &amp; Mode</div>
-        <div class="value db-active-badge">SQLite (:memory:)</div>
+        <div class="value db-active-badge">SQLite (disk)</div>
       </div>
       <div class="stat">
         <div class="label">Bills Table Rows</div>
@@ -122,7 +122,7 @@
     <!-- SQL Console Card -->
     <div class="card form sql-console-card">
       <h3>Interactive SQLite Console</h3>
-      <p class="hint">Execute arbitrary SQL queries against the in-memory database.</p>
+      <p class="hint">Inspect the loaded snapshot using supported SELECT queries. SQL is never executed by the local API.</p>
       <div class="sql-shortcuts">
         <span>Quick Queries:</span>
         <button type="button" class="btn small ghost btn-quick-sql" data-sql="SELECT * FROM bills ORDER BY number ASC;">All Bills</button>
@@ -344,7 +344,7 @@
 <div class="print-area" id="print-area" hidden></div>
 
 <footer class="footer">
-  Cheque-Style Bill Book &nbsp;·&nbsp; In-Memory SQLite Engine &nbsp;·&nbsp; Data stored in memory &amp; backed up locally.
+  Cheque-Style Bill Book &nbsp;·&nbsp; Local SQLite Engine &nbsp;·&nbsp; Data stored on this computer. Export backups regularly.
 </footer>
 
 <script src="sqlite-engine.js"></script>

@@ -1,206 +1,74 @@
 /**
- * In-Memory SQLite Engine & Store for Bill Book
- * Provides relational table management, SQL execution, query logging,
- * and standard .sql export/import in memory.
+ * Local SQLite frontend adapter for Bill Book
+ * Committed HTTP mutations, read-only snapshot queries, and SQL data export.
  */
 "use strict";
 
 class InMemorySQLite {
-  constructor(storageKey = "billbook.sqlite.memory") {
-    this.storageKey = storageKey;
-    this.tables = {
-      settings: [],
-      bills: [],
-      query_log: [],
-    };
+  constructor() {
+    this.tables = { settings: [], bills: [] };
     this.queryLog = [];
-    this.initSchema();
-    this.loadFromStorage();
+    this.token = null;
   }
 
-  initSchema() {
-    this.logQuery("CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, book_name TEXT, address TEXT, gstin TEXT, currency TEXT DEFAULT '₹', range_from INTEGER DEFAULT 1, range_to INTEGER DEFAULT 50, default_gst_rate REAL DEFAULT 18.0, default_gst_type TEXT DEFAULT 'cgst_sgst', legal_line TEXT DEFAULT 'Subject to local District Jurisdiction only', logo_url TEXT DEFAULT '', updated_at TEXT);");
-    this.logQuery("CREATE TABLE IF NOT EXISTS bills (number INTEGER PRIMARY KEY, date TEXT NOT NULL, due_date TEXT, payee TEXT NOT NULL, payee_gstin TEXT, memo TEXT, base_amount REAL NOT NULL, gst_rate REAL DEFAULT 0, gst_type TEXT DEFAULT 'none', cgst_amount REAL DEFAULT 0, sgst_amount REAL DEFAULT 0, igst_amount REAL DEFAULT 0, amount REAL NOT NULL, status TEXT DEFAULT 'issued', issued_at TEXT NOT NULL, paid_at TEXT, void_at TEXT);");
-    this.logQuery("CREATE TABLE IF NOT EXISTS query_log (id INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT NOT NULL, params TEXT, executed_at TEXT NOT NULL);");
+  logQuery(sql) {
+    this.queryLog.unshift({ sql, time: new Date().toLocaleTimeString() });
+    this.queryLog = this.queryLog.slice(0, 200);
   }
 
-  logQuery(sql, params = null) {
-    const entry = {
-      id: this.queryLog.length + 1,
-      sql: sql.trim(),
-      params: params ? JSON.stringify(params) : null,
-      time: new Date().toLocaleTimeString(),
-      timestamp: new Date().toISOString(),
-    };
-    this.queryLog.unshift(entry);
-    if (this.queryLog.length > 200) this.queryLog.pop();
+  async initialize() {
+    const response = await fetch('/api/state', { cache: 'no-store' });
+    const state = await response.json();
+    if (!response.ok) throw new Error(state.error || 'Cannot load database');
+    this.token = state.csrf_token;
+    this.applyState(state);
   }
 
-  saveToStorage() {
+  applyState(state) {
+    this.tables = {settings: [state.settings], bills: state.bills};
+  }
+
+  async mutate(path, data) {
+    let response;
     try {
-      const data = {
-        settings: this.tables.settings,
-        bills: this.tables.bills,
-      };
-      localStorage.setItem(this.storageKey, JSON.stringify(data));
-    } catch (e) {
-      console.warn("Storage save failed:", e);
+      response = await fetch(path, {
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': this.token},
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      throw new Error('Local server unavailable. Save is not confirmed. Restart the server and reload before retrying.');
     }
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Save failed');
+    this.applyState(payload.state);
+    this.logQuery(path);
+    return payload.result;
   }
 
-  loadFromStorage() {
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.settings && Array.isArray(parsed.settings)) {
-          this.tables.settings = parsed.settings;
-          if (this.tables.settings[0]) {
-            if (!this.tables.settings[0].legal_line) {
-              this.tables.settings[0].legal_line = "Subject to local District Jurisdiction only";
-            }
-            if (this.tables.settings[0].logo_url === undefined) {
-              this.tables.settings[0].logo_url = "";
-            }
-          }
-        }
-        if (parsed.bills && Array.isArray(parsed.bills)) {
-          this.tables.bills = parsed.bills.map((b) => ({
-            ...b,
-            due_date: b.due_date || b.date || "",
-          }));
-        }
-        return;
+  async migrateBrowserData() {
+    const sources = [];
+    for (const key of ['billbook.sqlite.memory', 'billbook.v1']) {
+      let raw;
+      try { raw = localStorage.getItem(key); }
+      catch (error) { alert('Browser storage is inaccessible. No browser data has been changed. You can still use the local SQLite database.'); return; }
+      if (raw !== null) sources.push({key, raw});
+    }
+    for (const {key, raw} of sources) {
+      if (!confirm(`Existing browser data found (${key}). Import into SQLite now? Existing invoice numbers will never be overwritten. The entire import fails on any conflict. Your browser data will remain untouched. Cancel to skip.`)) continue;
+      try {
+        const result = await this.mutate('/api/import', {
+          payload: JSON.parse(raw), source: key, raw_source: raw, confirm_import: true,
+        });
+        alert(`Imported ${result.count} invoices into SQLite. Original browser data has been preserved.`);
+      } catch (error) {
+        alert(`Migration did not complete: ${error.message}. Original browser data has been preserved.`);
       }
-
-      // Check legacy billbook.v1 for seamless migration
-      const legacyRaw = localStorage.getItem("billbook.v1");
-      if (legacyRaw) {
-        const legacy = JSON.parse(legacyRaw);
-        if (legacy.settings) {
-          this.tables.settings = [{
-            id: 1,
-            book_name: legacy.settings.bookName || "",
-            address: legacy.settings.address || "",
-            gstin: "",
-            currency: legacy.settings.currency || "₹",
-            range_from: legacy.settings.from || 1,
-            range_to: legacy.settings.to || 50,
-            default_gst_rate: 18.0,
-            default_gst_type: "cgst_sgst",
-            legal_line: "Subject to local District Jurisdiction only",
-            logo_url: "",
-            updated_at: new Date().toISOString(),
-          }];
-        }
-        if (legacy.bills) {
-          this.tables.bills = Object.values(legacy.bills).map((b) => ({
-            number: Number(b.number),
-            date: b.date || "",
-            due_date: b.date || "",
-            payee: b.payee || "",
-            payee_gstin: "",
-            memo: b.memo || "",
-            base_amount: Number(b.amount || 0),
-            gst_rate: 0,
-            gst_type: "none",
-            cgst_amount: 0,
-            sgst_amount: 0,
-            igst_amount: 0,
-            amount: Number(b.amount || 0),
-            status: b.status || "issued",
-            issued_at: b.issuedAt || new Date().toISOString(),
-            paid_at: b.paidAt || null,
-            void_at: b.voidAt || null,
-          }));
-        }
-        this.saveToStorage();
-        return;
-      }
-    } catch (e) {
-      console.warn("Could not load from storage:", e);
     }
-
-    // Default settings row
-    if (this.tables.settings.length === 0) {
-      this.tables.settings = [{
-        id: 1,
-        book_name: "",
-        address: "",
-        gstin: "",
-        currency: "₹",
-        range_from: 1,
-        range_to: 50,
-        default_gst_rate: 18.0,
-        default_gst_type: "cgst_sgst",
-        legal_line: "Subject to local District Jurisdiction only",
-        logo_url: "",
-        updated_at: new Date().toISOString(),
-      }];
-    }
-  }
-
-  /* ---------------- Core SQL Execution ---------------- */
-
-  execute(sql, params = {}) {
-    const trimmed = sql.trim();
-    this.logQuery(trimmed, params);
-
-    // INSERT INTO bills
-    if (/^INSERT\s+INTO\s+bills/i.test(trimmed)) {
-      const bill = { ...params };
-      if (!bill.due_date) bill.due_date = bill.date || "";
-      const idx = this.tables.bills.findIndex((b) => b.number === bill.number);
-      if (idx >= 0) {
-        this.tables.bills[idx] = bill;
-      } else {
-        this.tables.bills.push(bill);
-      }
-      this.tables.bills.sort((a, b) => a.number - b.number);
-      this.saveToStorage();
-      return { success: true, changes: 1 };
-    }
-
-    // UPDATE bills
-    if (/^UPDATE\s+bills/i.test(trimmed)) {
-      let changes = 0;
-      const num = params.number;
-      const bill = this.tables.bills.find((b) => b.number === num);
-      if (bill) {
-        Object.assign(bill, params);
-        changes++;
-      }
-      this.saveToStorage();
-      return { success: true, changes };
-    }
-
-    // UPDATE settings / INSERT INTO settings
-    if (/^UPDATE\s+settings|^INSERT\s+OR\s+REPLACE\s+INTO\s+settings/i.test(trimmed)) {
-      const s = {
-        id: 1,
-        ...params,
-        legal_line: params.legal_line || "Subject to local District Jurisdiction only",
-        logo_url: params.logo_url || "",
-        updated_at: new Date().toISOString(),
-      };
-      this.tables.settings = [s];
-      this.saveToStorage();
-      return { success: true, changes: 1 };
-    }
-
-    // DELETE FROM bills (reset)
-    if (/^DELETE\s+FROM\s+bills/i.test(trimmed)) {
-      const count = this.tables.bills.length;
-      this.tables.bills = [];
-      this.saveToStorage();
-      return { success: true, changes: count };
-    }
-
-    return { success: true, changes: 0 };
   }
 
   query(sql) {
     const trimmed = sql.trim();
+    if (!/^SELECT\s/i.test(trimmed)) throw new Error('Only read-only snapshot SELECT queries are supported');
     this.logQuery(trimmed);
 
     // SELECT * FROM settings
@@ -299,66 +167,22 @@ class InMemorySQLite {
 
   /* ---------------- Helper Methods ---------------- */
 
-  getSettings() {
-    if (!this.tables.settings.length) this.loadFromStorage();
-    return this.tables.settings[0] || {
-      id: 1,
-      book_name: "",
-      address: "",
-      gstin: "",
-      currency: "₹",
-      range_from: 1,
-      range_to: 50,
-      default_gst_rate: 18.0,
-      default_gst_type: "cgst_sgst",
-      legal_line: "Subject to local District Jurisdiction only",
-      logo_url: "",
-      updated_at: new Date().toISOString(),
-    };
+  getSettings() { return this.tables.settings[0]; }
+  getBills() { return [...this.tables.bills]; }
+  getBill(number) { return this.tables.bills.find(b => b.number === number); }
+  saveSettings(settings) { return this.mutate('/api/settings', settings); }
+  insertBill(bill) { return this.mutate('/api/bills/issue', bill); }
+  updateBillStatus(number, status) {
+    return this.mutate('/api/bills/status', {number, status, expected_status: this.getBill(number).status});
   }
-
-  saveSettings(s) {
-    this.execute("UPDATE settings SET book_name = :book_name, address = :address, gstin = :gstin, currency = :currency, range_from = :range_from, range_to = :range_to, default_gst_rate = :default_gst_rate, default_gst_type = :default_gst_type, legal_line = :legal_line, logo_url = :logo_url WHERE id = 1;", s);
+  resetAll() { return this.mutate('/api/reset', {confirm_reset: true}); }
+  async importSQL(sql) {
+    if (!confirm('Import this SQL dump? The import is atomic and existing invoices or conflicting settings will not be overwritten.')) throw new Error('Import cancelled');
+    return (await this.mutate('/api/import', {sql, confirm_import: true})).count;
   }
-
-  getBills() {
-    return this.query("SELECT * FROM bills ORDER BY number ASC;");
-  }
-
-  getBill(num) {
-    const res = this.query(`SELECT * FROM bills WHERE number = ${num};`);
-    return res[0] || null;
-  }
-
-  insertBill(bill) {
-    return this.execute("INSERT INTO bills (number, date, due_date, payee, payee_gstin, memo, base_amount, gst_rate, gst_type, cgst_amount, sgst_amount, igst_amount, amount, status, issued_at) VALUES (:number, :date, :due_date, :payee, :payee_gstin, :memo, :base_amount, :gst_rate, :gst_type, :cgst_amount, :sgst_amount, :igst_amount, :amount, :status, :issued_at);", bill);
-  }
-
-  updateBillStatus(num, status) {
-    const now = new Date().toISOString();
-    const updateObj = { number: num, status };
-    if (status === "paid") updateObj.paid_at = now;
-    if (status === "void") updateObj.void_at = now;
-    return this.execute("UPDATE bills SET status = :status WHERE number = :number;", updateObj);
-  }
-
-  resetAll() {
-    this.execute("DELETE FROM bills;");
-    this.tables.settings = [{
-      id: 1,
-      book_name: "",
-      address: "",
-      gstin: "",
-      currency: "₹",
-      range_from: 1,
-      range_to: 50,
-      default_gst_rate: 18.0,
-      default_gst_type: "cgst_sgst",
-      legal_line: "Subject to local District Jurisdiction only",
-      logo_url: "",
-      updated_at: new Date().toISOString(),
-    }];
-    this.saveToStorage();
+  async importJSON(payload) {
+    if (!confirm('Import this JSON data? The import is atomic and existing invoices or conflicting settings will not be overwritten.')) throw new Error('Import cancelled');
+    return this.mutate('/api/import', {payload, confirm_import: true});
   }
 
   /* ---------------- SQL Dump / Export / Import ---------------- */
@@ -367,9 +191,9 @@ class InMemorySQLite {
     const s = this.getSettings();
     const bills = this.getBills();
     let sql = `-- ========================================================\n`;
-    sql += `-- Bill Book SQLite Memory Database Dump\n`;
+    sql += `-- Bill Book SQLite Database Dump\n`;
     sql += `-- Generated: ${new Date().toISOString()}\n`;
-    sql += `-- SQLite In-Memory Database Script\n`;
+    sql += `-- SQLite data export\n`;
     sql += `-- ========================================================\n\n`;
 
     sql += `PRAGMA foreign_keys = ON;\n\n`;
@@ -416,7 +240,7 @@ class InMemorySQLite {
     if (bills.length > 0) {
       sql += `-- Bills Records (${bills.length})\n`;
       bills.forEach((b) => {
-        sql += `INSERT OR REPLACE INTO bills (number, date, due_date, payee, payee_gstin, memo, base_amount, gst_rate, gst_type, cgst_amount, sgst_amount, igst_amount, amount, status, issued_at, paid_at, void_at)\n`;
+        sql += `INSERT INTO bills (number, date, due_date, payee, payee_gstin, memo, base_amount, gst_rate, gst_type, cgst_amount, sgst_amount, igst_amount, amount, status, issued_at, paid_at, void_at)\n`;
         sql += `VALUES (${b.number}, ${this.escapeSQL(b.date)}, ${this.escapeSQL(b.due_date || b.date)}, ${this.escapeSQL(b.payee)}, ${this.escapeSQL(b.payee_gstin)}, ${this.escapeSQL(b.memo)}, ${b.base_amount}, ${b.gst_rate}, ${this.escapeSQL(b.gst_type)}, ${b.cgst_amount}, ${b.sgst_amount}, ${b.igst_amount}, ${b.amount}, ${this.escapeSQL(b.status)}, ${this.escapeSQL(b.issued_at)}, ${this.escapeSQL(b.paid_at)}, ${this.escapeSQL(b.void_at)});\n`;
       });
     }
@@ -429,125 +253,6 @@ class InMemorySQLite {
     return "'" + String(val).replace(/'/g, "''") + "'";
   }
 
-  importSQL(sqlText) {
-    const lines = sqlText.split("\n");
-    let importedBills = 0;
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("--") || trimmed.startsWith("PRAGMA") || trimmed.startsWith("CREATE")) return;
+ }
 
-      // Match INSERT INTO bills
-      if (/INSERT.*?INTO\s+bills/i.test(trimmed)) {
-        const valMatch = trimmed.match(/VALUES\s*\((.+)\);?/i);
-        if (valMatch) {
-          const parts = this.parseSQLValues(valMatch[1]);
-          if (parts.length >= 13) {
-            const bill = {
-              number: parseInt(parts[0], 10),
-              date: parts[1],
-              due_date: parts[2] || parts[1],
-              payee: parts[3],
-              payee_gstin: parts[4] || "",
-              memo: parts[5] || "",
-              base_amount: parseFloat(parts[6]) || 0,
-              gst_rate: parseFloat(parts[7]) || 0,
-              gst_type: parts[8] || "none",
-              cgst_amount: parseFloat(parts[9]) || 0,
-              sgst_amount: parseFloat(parts[10]) || 0,
-              igst_amount: parseFloat(parts[11]) || 0,
-              amount: parseFloat(parts[12]) || 0,
-              status: parts[13] || "issued",
-              issued_at: parts[14] || new Date().toISOString(),
-              paid_at: parts[15] || null,
-              void_at: parts[16] || null,
-            };
-            this.insertBill(bill);
-            importedBills++;
-          } else if (parts.length >= 12) {
-            // Backward compatibility without due_date column
-            const bill = {
-              number: parseInt(parts[0], 10),
-              date: parts[1],
-              due_date: parts[1],
-              payee: parts[2],
-              payee_gstin: parts[3] || "",
-              memo: parts[4] || "",
-              base_amount: parseFloat(parts[5]) || 0,
-              gst_rate: parseFloat(parts[6]) || 0,
-              gst_type: parts[7] || "none",
-              cgst_amount: parseFloat(parts[8]) || 0,
-              sgst_amount: parseFloat(parts[9]) || 0,
-              igst_amount: parseFloat(parts[10]) || 0,
-              amount: parseFloat(parts[11]) || 0,
-              status: parts[12] || "issued",
-              issued_at: parts[13] || new Date().toISOString(),
-              paid_at: parts[14] || null,
-              void_at: parts[15] || null,
-            };
-            this.insertBill(bill);
-            importedBills++;
-          }
-        }
-      }
-
-      // Match INSERT INTO settings
-      if (/INSERT.*?INTO\s+settings/i.test(trimmed)) {
-        const valMatch = trimmed.match(/VALUES\s*\((.+)\);?/i);
-        if (valMatch) {
-          const parts = this.parseSQLValues(valMatch[1]);
-          if (parts.length >= 8) {
-            const s = {
-              id: 1,
-              book_name: parts[1] || "",
-              address: parts[2] || "",
-              gstin: parts[3] || "",
-              currency: parts[4] || "₹",
-              range_from: parseInt(parts[5], 10) || 1,
-              range_to: parseInt(parts[6], 10) || 50,
-              default_gst_rate: parseFloat(parts[7]) || 18.0,
-              default_gst_type: parts[8] || "cgst_sgst",
-              legal_line: parts[9] || "Subject to local District Jurisdiction only",
-              logo_url: parts[10] || "",
-              updated_at: new Date().toISOString(),
-            };
-            this.saveSettings(s);
-          }
-        }
-      }
-    });
-
-    this.saveToStorage();
-    return importedBills;
-  }
-
-  parseSQLValues(str) {
-    const result = [];
-    let current = "";
-    let inQuote = false;
-    for (let i = 0; i < str.length; i++) {
-      const c = str[i];
-      if (c === "'" && (i === 0 || str[i - 1] !== "\\")) {
-        inQuote = !inQuote;
-      } else if (c === "," && !inQuote) {
-        result.push(this.cleanSQLVal(current));
-        current = "";
-      } else {
-        current += c;
-      }
-    }
-    if (current) result.push(this.cleanSQLVal(current));
-    return result;
-  }
-
-  cleanSQLVal(val) {
-    const trimmed = val.trim();
-    if (trimmed.toUpperCase() === "NULL") return null;
-    if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
-      return trimmed.slice(1, -1).replace(/''/g, "'");
-    }
-    return trimmed;
-  }
-}
-
-// Global instance for browser environment
 window.db = new InMemorySQLite();
