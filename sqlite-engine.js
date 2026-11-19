@@ -175,6 +175,9 @@ class InMemorySQLite {
   updateBillStatus(number, status) {
     return this.mutate('/api/bills/status', {number, status, expected_status: this.getBill(number).status});
   }
+  saveInvoiceDetails(number, details) {
+    return this.mutate('/api/bills/details', {number, details, expected_details: this.getBill(number).details || null});
+  }
   resetAll() { return this.mutate('/api/reset', {confirm_reset: true}); }
   async importSQL(sql) {
     if (!confirm('Import this SQL dump? The import is atomic and existing invoices or conflicting settings will not be overwritten.')) throw new Error('Import cancelled');
@@ -230,7 +233,8 @@ class InMemorySQLite {
     sql += `  status TEXT DEFAULT 'issued',\n`;
     sql += `  issued_at TEXT NOT NULL,\n`;
     sql += `  paid_at TEXT,\n`;
-    sql += `  void_at TEXT\n`;
+    sql += `  void_at TEXT,\n`;
+    sql += `  details TEXT\n`;
     sql += `);\n\n`;
 
     sql += `-- Settings Data\n`;
@@ -240,8 +244,8 @@ class InMemorySQLite {
     if (bills.length > 0) {
       sql += `-- Bills Records (${bills.length})\n`;
       bills.forEach((b) => {
-        sql += `INSERT INTO bills (number, date, due_date, payee, payee_gstin, memo, base_amount, gst_rate, gst_type, cgst_amount, sgst_amount, igst_amount, amount, status, issued_at, paid_at, void_at)\n`;
-        sql += `VALUES (${b.number}, ${this.escapeSQL(b.date)}, ${this.escapeSQL(b.due_date || b.date)}, ${this.escapeSQL(b.payee)}, ${this.escapeSQL(b.payee_gstin)}, ${this.escapeSQL(b.memo)}, ${b.base_amount}, ${b.gst_rate}, ${this.escapeSQL(b.gst_type)}, ${b.cgst_amount}, ${b.sgst_amount}, ${b.igst_amount}, ${b.amount}, ${this.escapeSQL(b.status)}, ${this.escapeSQL(b.issued_at)}, ${this.escapeSQL(b.paid_at)}, ${this.escapeSQL(b.void_at)});\n`;
+        sql += `INSERT INTO bills (number, date, due_date, payee, payee_gstin, memo, base_amount, gst_rate, gst_type, cgst_amount, sgst_amount, igst_amount, amount, status, issued_at, paid_at, void_at${b.details ? ", details" : ""})\n`;
+        sql += `VALUES (${b.number}, ${this.escapeSQL(b.date)}, ${this.escapeSQL(b.due_date || b.date)}, ${this.escapeSQL(b.payee)}, ${this.escapeSQL(b.payee_gstin)}, ${this.escapeSQL(b.memo)}, ${b.base_amount}, ${b.gst_rate}, ${this.escapeSQL(b.gst_type)}, ${b.cgst_amount}, ${b.sgst_amount}, ${b.igst_amount}, ${b.amount}, ${this.escapeSQL(b.status)}, ${this.escapeSQL(b.issued_at)}, ${this.escapeSQL(b.paid_at)}, ${this.escapeSQL(b.void_at)}${b.details ? ", " + this.escapeSQL(JSON.stringify(b.details)) : ""});\n`;
       });
     }
 

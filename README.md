@@ -6,6 +6,10 @@ A browser-based billing application that combines a cheque-book interface with G
 
 ## Features
 
+- **Funeral Farewell template:** Respectful Farewell by default, with an explicitly selected Dark Humor novelty mode. Saved taxes stay unchanged, with a separate exemption-review reminder. See the [Funeral Farewell guide](docs/funeral-farewell.md).
+
+- **Optional Wedding Invitation template:** Elegant and Playful modes, responsive preview, A4 printing, RSVP contacts, and optional itemisation of existing saved amounts. Cheque Style remains the default. See the [wedding template guide](docs/wedding-invoice.md).
+
 - **Cheque-style bills:** Printable leaves with a counterfoil, boxed date, amount in words, signature area, and decorative MICR-style band.
 - **GST calculations:** Optional GST with preset or custom rates, CGST + SGST for intra-state bills, and IGST for inter-state bills.
 - **Business profile:** Configure the issuer name, address, GSTIN, currency symbol, logo, and legal footer.
@@ -85,6 +89,10 @@ The server listens only on `127.0.0.1`, validates Host and Origin, requires CSRF
 Cheque-style-bill-book/
 ├── index.html          # Application views, forms, and dialogs
 ├── styles.css          # Interface, cheque layout, and print styles
+├── invoice-templates.js # Pure invoice model and wedding renderer
+├── invoice-preview.js   # Template selectors, preview, and optional details editor
+├── invoice-templates.css # Wedding screen and A4 print styles
+├── wedding-floral.svg    # Local decorative floral asset
 ├── app.js              # Billing workflow, GST calculations, and rendering
 ├── sqlite-engine.js    # Backend adapter, snapshot query support, and SQL export
 ├── server.py           # Protected loopback HTTP server and operations CLI
@@ -111,6 +119,8 @@ Cheque-style-bill-book/
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 node tests/frontend.test.js
+node tests/templates.test.js
+node tests/funeral.test.js
 ```
 
 Node.js is needed only for frontend tests. Optional Chromium integration checks and manual acceptance steps are documented in the [Linux guide](docs/linux-local-storage.md).

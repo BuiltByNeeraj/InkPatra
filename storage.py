@@ -1,6 +1,7 @@
 """Disk-backed bill book. No third-party dependencies; no tax recalculation."""
 from contextlib import contextmanager, closing
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 import fcntl
 import hashlib
@@ -17,6 +18,8 @@ DEFAULTS = dict(id=1, book_name='', address='', gstin='', currency='₹', range_
                 legal_line='Subject to local District Jurisdiction only', logo_url='', updated_at='')
 BILL_FIELDS = ('number date due_date payee payee_gstin memo base_amount gst_rate gst_type '
                'cgst_amount sgst_amount igst_amount amount status issued_at paid_at void_at').split()
+DETAILS_SCHEMA = '''CREATE TABLE invoice_details (
+ number INTEGER PRIMARY KEY REFERENCES bills(number) ON DELETE CASCADE, content TEXT NOT NULL);'''
 SCHEMA = '''
 CREATE TABLE settings (
  id INTEGER PRIMARY KEY CHECK(id=1), book_name TEXT, address TEXT, gstin TEXT,
@@ -29,8 +32,8 @@ CREATE TABLE bills (
  amount REAL NOT NULL, status TEXT CHECK(status IN ('issued','paid','void')) NOT NULL,
  issued_at TEXT NOT NULL, paid_at TEXT, void_at TEXT);
 CREATE TABLE migrations (digest TEXT PRIMARY KEY, source TEXT NOT NULL, created_at TEXT NOT NULL);
-PRAGMA user_version=1;
 '''
+SCHEMA += DETAILS_SCHEMA + '\nPRAGMA user_version=2;'
 
 
 def now():
@@ -81,8 +84,33 @@ def settings_record(raw):
     return result
 
 
+def invoice_details(raw, taxable):
+    """Optional presentation fields. Itemisation describes the existing taxable amount."""
+    fields = ('recipient_address', 'seller_mobile', 'seller_email', 'seller_website')
+    if not isinstance(raw, dict) or set(raw) - {*fields, 'items'}:
+        raise ValueError('Invalid invoice detail fields')
+    result = {key: raw.get(key, '') for key in fields}
+    for key, value in result.items():
+        if not isinstance(value, str):
+            raise ValueError(f'Invalid {key}')
+    items = raw.get('items', [])
+    if not isinstance(items, list) or len(items) > 2000:
+        raise ValueError('Expected up to 2000 line items')
+    result['items'] = []
+    for item in items:
+        if not isinstance(item, dict) or set(item) != {'description', 'taxable_value'}:
+            raise ValueError('Each item requires a description and taxable value')
+        if not isinstance(item['description'], str) or not item['description'].strip():
+            raise ValueError('Item description is required')
+        numeric(item['taxable_value'], 'item taxable value')
+        result['items'].append(dict(item))
+    if items and sum((Decimal(str(item['taxable_value'])) for item in items), Decimal(0)) != Decimal(str(taxable)):
+        raise ValueError('Item taxable values must add up exactly to the saved invoice taxable value')
+    return result
+
+
 def bill_record(raw):
-    if not isinstance(raw, dict) or set(raw) - set(BILL_FIELDS):
+    if not isinstance(raw, dict) or set(raw) - {*BILL_FIELDS, 'details'}:
         raise ValueError('Invalid invoice fields')
     r = dict(raw)
     integer(r.get('number'), 'number')
@@ -112,6 +140,8 @@ def bill_record(raw):
         r.setdefault(key, None)
         if r[key] is not None and not isinstance(r[key], str):
             raise ValueError(f'Invalid {key}')
+    if 'details' in r:
+        r['details'] = invoice_details(r['details'], r['base_amount'])
     return r
 
 
@@ -173,7 +203,7 @@ def parse_sql_dump(text):
             raise ValueError('Only application SQL dump data is supported')
         table, columns, values = match.groups()
         columns = [c.strip() for c in columns.split(',')]
-        allowed = set(DEFAULTS if table.lower() == 'settings' else BILL_FIELDS)
+        allowed = set(DEFAULTS if table.lower() == 'settings' else [*BILL_FIELDS, 'details'])
         if len(set(columns)) != len(columns) or set(columns) - allowed:
             raise ValueError('Unknown or duplicate SQL columns')
         tokens, pos = [], 0
@@ -191,6 +221,8 @@ def parse_sql_dump(text):
         if len(tokens) != len(columns) or pos != len(values):
             raise ValueError('Invalid SQL values')
         record = dict(zip(columns, tokens))
+        if 'details' in record:
+            record['details'] = json.loads(record['details'])
         if table.lower() == 'settings':
             if 'settings' in payload:
                 raise ValueError('Duplicate settings')
@@ -222,6 +254,15 @@ class Store:
                     self._settings(con, {**DEFAULTS, 'updated_at': now()})
             os.chmod(self.path, 0o600)
             self.validate(self.path)
+            with closing(sqlite3.connect(self.path)) as check:
+                version = check.execute('PRAGMA user_version').fetchone()[0]
+            if version == 1:
+                recovery = self.backup()
+                with self.connection() as con:
+                    con.execute(DETAILS_SCHEMA)
+                    con.execute('PRAGMA user_version=2')
+                print('Schema upgraded; verified recovery backup:', recovery, flush=True)
+            self.validate(self.path)
         except Exception:
             self.close()
             raise
@@ -252,11 +293,19 @@ class Store:
     @staticmethod
     def _insert(con, bill):
         con.execute('INSERT INTO bills (' + ','.join(BILL_FIELDS) + ') VALUES (' + ','.join('?' for _ in BILL_FIELDS) + ')', [bill[k] for k in BILL_FIELDS])
+        if 'details' in bill:
+            con.execute('INSERT INTO invoice_details VALUES (?,?)', (bill['number'], json.dumps(bill['details'], ensure_ascii=False)))
 
     @staticmethod
     def _snapshot(con):
-        return dict(settings=dict(con.execute('SELECT * FROM settings WHERE id=1').fetchone()),
-                    bills=[dict(r) for r in con.execute('SELECT * FROM bills ORDER BY number')])
+        result = dict(settings=dict(con.execute('SELECT * FROM settings WHERE id=1').fetchone()),
+                      bills=[dict(r) for r in con.execute('SELECT * FROM bills ORDER BY number')])
+        if con.execute('PRAGMA user_version').fetchone()[0] == 2:
+            details = {r['number']: json.loads(r['content']) for r in con.execute('SELECT * FROM invoice_details')}
+            for bill in result['bills']:
+                if bill['number'] in details:
+                    bill['details'] = details[bill['number']]
+        return result
 
     def snapshot(self):
         with self.connection() as con:
@@ -301,6 +350,21 @@ class Store:
             con.execute(f'UPDATE bills SET status=?, {key}=? WHERE number=?', (status, now(), number))
             result = dict(con.execute('SELECT * FROM bills WHERE number=?', (number,)).fetchone())
         return result
+
+    def save_invoice_details(self, number, raw, expected):
+        integer(number, 'number')
+        with self.connection() as con:
+            bill = con.execute('SELECT base_amount FROM bills WHERE number=?', (number,)).fetchone()
+            if bill is None:
+                raise ValueError('Invoice not found')
+            previous = con.execute('SELECT content FROM invoice_details WHERE number=?', (number,)).fetchone()
+            previous = json.loads(previous['content']) if previous else None
+            if previous != expected:
+                raise ValueError('Invoice details changed in another tab; reload before saving')
+            details = invoice_details(raw, bill['base_amount'])
+            con.execute('INSERT INTO invoice_details VALUES (?,?) ON CONFLICT(number) DO UPDATE SET content=excluded.content',
+                        (number, json.dumps(details, ensure_ascii=False)))
+        return details
 
     def import_data(self, payload, source='file', raw_source=None):
         if not isinstance(source, str) or len(source) > 128 or (raw_source is not None and not isinstance(raw_source, str)):
@@ -361,12 +425,19 @@ class Store:
             con.row_factory = sqlite3.Row
             if con.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise ValueError('Database integrity check failed')
-            if con.execute('PRAGMA user_version').fetchone()[0] != 1:
+            version = con.execute('PRAGMA user_version').fetchone()[0]
+            if version not in (1, 2):
                 raise ValueError('Unsupported backup version')
             objects = {(r['type'], r['name']) for r in con.execute("SELECT type,name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")}
-            if objects != {('table', 'settings'), ('table', 'bills'), ('table', 'migrations')}:
+            expected_objects = {('table', 'settings'), ('table', 'bills'), ('table', 'migrations')}
+            if version == 2:
+                expected_objects.add(('table', 'invoice_details'))
+            if objects != expected_objects:
                 raise ValueError('Unexpected database objects')
-            for table, fields in [('settings', list(DEFAULTS)), ('bills', BILL_FIELDS), ('migrations', ['digest', 'source', 'created_at'])]:
+            tables = [('settings', list(DEFAULTS)), ('bills', BILL_FIELDS), ('migrations', ['digest', 'source', 'created_at'])]
+            if version == 2:
+                tables.append(('invoice_details', ['number', 'content']))
+            for table, fields in tables:
                 if [r['name'] for r in con.execute(f'PRAGMA table_info({table})')] != fields:
                     raise ValueError('Invalid backup schema')
             settings = con.execute('SELECT * FROM settings').fetchall()
@@ -375,7 +446,17 @@ class Store:
             settings_record(dict(settings[0]))
             for row in con.execute('SELECT * FROM bills'):
                 bill_record(dict(row))
-            return Store._snapshot(con)
+            if con.execute('PRAGMA foreign_key_check').fetchone():
+                raise ValueError('Orphaned invoice details')
+            result = Store._snapshot(con)
+            for bill in result['bills']:
+                bill_record(bill)
+            if version == 2:
+                numbers = {bill['number'] for bill in result['bills']}
+                for row in con.execute('SELECT number FROM invoice_details'):
+                    if row['number'] not in numbers:
+                        raise ValueError('Orphaned invoice details')
+            return result
 
     def backup(self, destination=None):
         destination = outside_repo(destination) if destination else self.directory / ('backup-' + uuid.uuid4().hex + '.sqlite3')

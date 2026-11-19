@@ -13,6 +13,15 @@ from storage import Store, parse_sql_dump
 ROOT = Path(__file__).resolve().parent
 ASSETS = {'/': ('index.html', 'text/html'), '/index.html': ('index.html', 'text/html'),
           '/app.js': ('app.js', 'text/javascript'), '/sqlite-engine.js': ('sqlite-engine.js', 'text/javascript'),
+          '/invoice-templates.js': ('invoice-templates.js', 'text/javascript'),
+          '/funeral-templates.js': ('funeral-templates.js', 'text/javascript'),
+          '/funeral-templates.css': ('funeral-templates.css', 'text/css'),
+          '/funeral-lily.svg': ('funeral-lily.svg', 'image/svg+xml'),
+          '/invoice-preview.js': ('invoice-preview.js', 'text/javascript'),
+          '/invoice-templates.css': ('invoice-templates.css', 'text/css'),
+          '/wedding-royal.svg': ('wedding-royal.svg', 'image/svg+xml'),
+          '/wedding-bouquet.svg': ('wedding-bouquet.svg', 'image/svg+xml'),
+          '/wedding-floral.svg': ('wedding-floral.svg', 'image/svg+xml'),
           '/styles.css': ('styles.css', 'text/css')}
 MAX_BODY = 16 * 1024 * 1024
 
@@ -107,6 +116,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = store.issue(data)
             elif path == '/api/bills/status':
                 result = store.update_status(data.get('number'), data.get('status'), data.get('expected_status'))
+            elif path == '/api/bills/details':
+                result = store.save_invoice_details(data.get('number'), data.get('details'), data.get('expected_details'))
             elif path == '/api/settings':
                 result = store.save_settings(data)
             elif path == '/api/import':

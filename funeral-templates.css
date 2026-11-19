@@ -1,0 +1,106 @@
+/* Funeral-only rules; no selectors alter the cheque or wedding templates. */
+.funeral-opt-in-note, .funeral-tax-review { font-size: 14px; line-height: 1.5; padding: 10px 12px; border-left: 3px solid #a6a0b2; background: #f2eff5; color: #514b5c; }
+.funeral-invoice {
+  --farewell-ink: #494650; --farewell-muted: #6f6b79; --farewell-rule: #d2cfd8; --farewell-panel: #f0edf3;
+  box-sizing: border-box; width: 100%; max-width: 186mm; margin: 0 auto;
+  padding: 26px 34px; background: #fffdf7; color: var(--farewell-ink);
+  border: 1px solid #c6c3cc; box-shadow: 0 8px 30px #443d4e17;
+  font: 15px/1.55 Georgia, 'Liberation Serif', 'DejaVu Serif', serif;
+  overflow-wrap: anywhere; word-break: normal;
+}
+.funeral-invoice *, .funeral-invoice *::before, .funeral-invoice *::after { box-sizing: border-box; min-width: 0; }
+.funeral-invoice p { margin: 5px 0; }
+.funeral-heading { text-align: center; border-bottom: 1px solid var(--farewell-rule); padding-bottom: 16px; }
+.funeral-lily { height: 90px; background: url('funeral-lily.svg') center / 138px 95px no-repeat; }
+.funeral-kicker { text-transform: uppercase; letter-spacing: .16em; color: var(--farewell-muted); font-size: 11px; }
+.funeral-heading h1 { font-size: 32px; line-height: 1.2; font-weight: normal; margin: 15px 0 12px; }
+.funeral-message { font-size: 16px; line-height: 1.6; max-width: 440px; margin: 0 auto !important; color: var(--farewell-muted); }
+.funeral-document-label { font-size: 13px; letter-spacing: .05em; margin-top: 18px !important; }
+.funeral-document-label span { padding: 0 8px; }
+.funeral-meta { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin: 16px 0 0; padding: 12px; background: var(--farewell-panel); }
+.funeral-invoice dt { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; color: var(--farewell-muted); }
+.funeral-meta dd { font-size: 17px; font-weight: bold; }
+.funeral-invoice dd { margin: 5px 0 0; }
+.funeral-parties { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; padding: 20px 0; }
+.funeral-invoice h2 { font-size: 15px; font-weight: bold; letter-spacing: .04em; margin: 0 0 10px; padding-bottom: 5px; border-bottom: 1px solid var(--farewell-rule); }
+.funeral-label { display: block; font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--farewell-muted); }
+.funeral-text { white-space: pre-wrap; }
+.funeral-items { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: inherit; }
+.funeral-col-number { width: 7%; }
+.funeral-col-value { width: 28%; }
+.funeral-items th { color: var(--farewell-ink); background: var(--farewell-panel); font-weight: bold; font-size: 11px; letter-spacing: .08em; }
+.funeral-items th, .funeral-items td { padding: 9px 6px; border-bottom: 1px solid var(--farewell-rule); white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
+.funeral-items th:last-child, .funeral-items td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.funeral-settlement { width: min(100%,360px); margin-left: auto; padding: 18px 0; }
+.funeral-settlement h2 { text-transform: uppercase; letter-spacing: .08em; }
+.funeral-totals { margin: 0; }
+.funeral-totals > div { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; padding: 5px 0; }
+.funeral-totals dt { text-transform: none; font-size: 15px; color: var(--farewell-ink); letter-spacing: normal; }
+.funeral-totals dd { text-align: right; font-variant-numeric: tabular-nums; margin: 0; }
+.funeral-total { border: 1px solid var(--farewell-muted); background: var(--farewell-panel); padding: 12px 10px !important; margin-top: 10px; }
+.funeral-total dt, .funeral-total dd { font-size: 22px; font-weight: bold; }
+.funeral-closing { text-align: center; border-top: 1px solid var(--farewell-rule); padding-top: 16px; }
+.funeral-closing .funeral-label { display: inline; margin-right: 7px; }
+.funeral-contacts { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 16px; }
+.funeral-signoff { color: var(--farewell-muted); font-style: italic; font-size: 15px; padding-top: 10px; }
+.funeral-contact-note, .funeral-jurisdiction { font-size: 11px; }
+.funeral-jurisdiction { white-space: pre-wrap; margin-top: 12px !important; }
+/* Novelty is clearly labeled in preview and on every printed document's header. */
+.funeral-dark { --farewell-ink: #f7f6f8; --farewell-muted: #d6d3da; --farewell-rule: #8a8591; --farewell-panel: #3a373f; background: #222026; border: 4px double #a29ba9; }
+.funeral-dark .funeral-heading { padding-top: 6px; }
+.funeral-novelty { padding: 8px 10px; font: bold 12px/1.5 Georgia,serif; border: 1px solid #c0b8c9; color: #fff; background: #4a4350; }
+.funeral-dark .funeral-lily { height: 66px; margin-top: 16px; background-size: 105px 72px; filter: grayscale(1); opacity: .8; }
+.funeral-dark .funeral-heading h1 { font-size: 39px; letter-spacing: .025em; font-variant: small-caps; }
+.funeral-dark .funeral-kicker { letter-spacing: .2em; }
+.funeral-dark .funeral-heading::after { content: '◇'; color: #c0b8c9; display: block; margin-top: 14px; font-size: 19px; }
+@media (max-width:600px) {
+  .funeral-invoice { padding: 16px; font-size: 12px; }
+  .funeral-heading h1 { font-size: 27px; }
+  .funeral-dark .funeral-heading h1 { font-size: 32px; }
+  .funeral-meta { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .funeral-parties { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .funeral-items th, .funeral-items td { padding: 8px 4px; }
+}
+@page farewell { size: A4 portrait; margin: 12mm; }
+@media print {
+  body:has(.print-area[data-template="funeral"]) { background: #fff !important; }
+  .print-area[data-template="funeral"] { page: farewell; }
+  .print-area > .funeral-invoice {
+    page: farewell; width: 100%; max-width: none; padding: 4mm 6mm; margin: 0; box-shadow: none;
+    font-size: 10.5pt; line-height: 1.45; overflow: visible; height: auto; max-height: none;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  .funeral-invoice p { margin: 3px 0; }
+  .funeral-lily { height: 70px; background-size: 112px 77px; }
+  .funeral-heading { padding-bottom: 12px; }
+  .funeral-heading h1 { font-size: 26pt; margin: 12px 0 8px; }
+  .funeral-message { font-size: 11.5pt; }
+  .funeral-kicker { font-size: 8.5pt; }
+  .funeral-document-label { font-size: 10pt; }
+  .funeral-meta { grid-template-columns: repeat(4,minmax(0,1fr)); margin-top: 12px; padding: 10px; }
+  .funeral-invoice dt { font-size: 8pt; }
+  .funeral-meta dd { font-size: 12pt; }
+  .funeral-invoice h2 { font-size: 11.5pt; }
+  .funeral-label { font-size: 8pt; }
+  .funeral-parties { grid-template-columns: minmax(0,1fr) minmax(0,1fr); padding: 14px 0; }
+  .funeral-items th { font-size: 8.5pt; }
+  .funeral-items th, .funeral-items td { padding: 7px 6px; }
+  .funeral-settlement { padding: 12px 0; width: min(100%,108mm); }
+  .funeral-totals dt, .funeral-totals dd { font-size: 11pt; }
+  .funeral-totals > div { padding: 3px 0; }
+  .funeral-total dt, .funeral-total dd { font-size: 16pt; }
+  .funeral-signoff { font-size: 11.5pt; }
+  .funeral-contact-note, .funeral-jurisdiction { font-size: 9pt; }
+  .funeral-novelty { font-size: 9.5pt; }
+  .funeral-closing { padding-top: 10px; }
+  .funeral-dark .funeral-heading h1 { font-size: 30pt; margin: 8px 0 6px; }
+  .funeral-dark .funeral-lily { height: 52px; margin-top: 8px; background-size: 80px 55px; }
+  .funeral-dark .funeral-heading::after { content: none; }
+  .funeral-dark .funeral-document-label { margin-top: 10px !important; }
+  .funeral-dark .funeral-parties, .funeral-dark .funeral-settlement { padding: 10px 0; }
+  .funeral-heading, .funeral-meta, .funeral-settlement, .funeral-closing { break-inside: avoid; }
+  .funeral-items thead { display: table-header-group; }
+  .funeral-items tr { break-inside: avoid; }
+  .funeral-services, .funeral-items, .funeral-invoice { break-inside: auto; }
+}

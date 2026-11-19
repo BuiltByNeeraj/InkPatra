@@ -120,6 +120,23 @@ class SecurityTests(unittest.TestCase):
         self.assertNotIn('state', json.loads(body))
         self.assertEqual(self.store.snapshot()['bills'], [])
 
+    def test_details_api_requires_csrf_and_preserves_financial_fields(self):
+        self.store.issue(invoice())
+        original=self.store.snapshot()['bills'][0]
+        data={'number':1,'details':{'seller_mobile':'9876543210','items':[{'description':'Services','taxable_value':500}]},'expected_details':None}
+        self.assertEqual(self.request('POST','/api/bills/details',{},data)[0],403)
+        self.assertEqual(self.request('POST','/api/bills/details',self.headers(),data)[0],200)
+        after=self.store.snapshot()['bills'][0]
+        self.assertEqual({key:value for key,value in after.items() if key!='details'},original)
+        self.assertEqual(len(self.store.snapshot()['bills']),1)
+
+    def test_template_assets_are_served_locally(self):
+        for asset in ['/invoice-templates.js','/invoice-preview.js','/invoice-templates.css','/wedding-floral.svg','/wedding-royal.svg','/wedding-bouquet.svg','/funeral-templates.js','/funeral-templates.css','/funeral-lily.svg']:
+            status,headers,body=self.request(path=asset)
+            self.assertEqual(status,200)
+            self.assertTrue(body)
+        self.assertTrue(self.request(path='/wedding-floral.svg')[1]['Content-Type'].startswith('image/svg+xml'))
+
 
 class ServerRestartTests(unittest.TestCase):
     def test_real_server_process_restart_and_committed_data(self):

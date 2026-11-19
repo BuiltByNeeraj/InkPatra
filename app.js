@@ -229,6 +229,7 @@ function renderBook() {
 
   const last = bills.filter((b) => b.status !== "void").sort((a, b) => b.number - a.number)[0];
   const btnPrintCurrent = document.getElementById("btn-print-current");
+  document.getElementById("btn-preview-current").disabled = !last;
   btnPrintCurrent.disabled = !last;
   btnPrintCurrent.style.opacity = last ? "1" : ".4";
 
@@ -283,6 +284,7 @@ function renderRegister() {
         <td class="num"><strong>${money(b.amount)}</strong></td>
         <td class="status"><span class="badge ${b.status}">${b.status}</span></td>
         <td class="actions">
+          <button class="btn small ghost" data-act="preview" data-n="${b.number}">Preview</button>
           ${b.status === "issued" ? `<button class="btn small primary" data-act="paid" data-n="${b.number}">Mark Paid</button>` : ""}
           ${b.status !== "void" ? `<button class="btn small ghost" data-act="print" data-n="${b.number}">Print Cheque</button>
           <button class="btn small danger ghost" data-act="void" data-n="${b.number}">Void</button>` : ""}
@@ -311,6 +313,8 @@ document.getElementById("register-body").addEventListener("click", committedActi
       renderRegister();
       renderBook();
     }
+  } else if (act === "preview") {
+    InvoicePreview.open(n);
   } else if (act === "print") {
     openPrint(n);
   }
@@ -720,13 +724,7 @@ function chequeHTML(b) {
 }
 
 function openPrint(n) {
-  const b = db.getBill(n);
-  if (!b) return;
-  const area = document.getElementById("print-area");
-  area.innerHTML = chequeHTML(b);
-  area.hidden = false;
-  window.print();
-  area.addEventListener("afterprint", () => { area.hidden = true; }, { once: true });
+  InvoicePreview.print(n);
 }
 
 /* ---------------- In-Memory SQLite View & Console ---------------- */
@@ -861,7 +859,7 @@ function fillSettings() {
   document.getElementById("set-to").value = s.range_to || 50;
   document.getElementById("set-default-gst-rate").value = String(s.default_gst_rate || 18);
   document.getElementById("set-default-gst-type").value = s.default_gst_type || "cgst_sgst";
-  document.getElementById("set-legal-line").value = s.legal_line || "Subject to local District Jurisdiction only";
+  document.getElementById("set-legal-line").value = s.legal_line ?? "";
   document.getElementById("set-logo-url").value = s.logo_url || "";
 
   const logoWrap = document.getElementById("logo-preview-wrap");
@@ -915,7 +913,7 @@ document.getElementById("form-settings").addEventListener("submit", committedAct
     range_to: newTo,
     default_gst_rate: parseFloat(document.getElementById("set-default-gst-rate").value) || 0,
     default_gst_type: document.getElementById("set-default-gst-type").value || "cgst_sgst",
-    legal_line: document.getElementById("set-legal-line").value.trim() || "Subject to local District Jurisdiction only",
+    legal_line: document.getElementById("set-legal-line").value.trim(),
     logo_url: document.getElementById("set-logo-url").value || "",
   };
 
@@ -1000,6 +998,7 @@ async function initializeApplication() {
   try {
     await db.initialize();
     await db.migrateBrowserData();
+    InvoicePreview.initialize(db, {cheque: chequeHTML, money, committedAction});
     fillSettings();
     renderBook();
     renderRegister();

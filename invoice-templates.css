@@ -1,0 +1,186 @@
+/* Isolated styles: original cheque rules and landscape print page are unchanged. */
+.invoice-preview-dialog { max-width: 1120px; width: min(1120px, 96vw); max-height: 94vh; overflow: auto; }
+.invoice-preview-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 16px 0; }
+.invoice-preview-toolbar label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.invoice-preview-canvas { padding: 18px; background: #ece7df; overflow: auto; }
+.invoice-preview-canvas > .cheque-container { margin: 0 auto; }
+.invoice-details { margin-bottom: 18px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.invoice-details summary { cursor: pointer; font-weight: bold; }
+.invoice-item-editor { display: grid; grid-template-columns: minmax(0, 1fr) 130px auto; gap: 8px; margin: 8px 0; align-items: end; }
+.invoice-item-editor label { min-width: 0; }
+.invoice-item-editor textarea { width: 100%; min-height: 64px; resize: vertical; }
+.invoice-preview-message { color: #742e40; font-size: 13px; }
+
+/* Shared document mechanics. Theme composition is defined separately below. */
+.wedding-invoice {
+  --wedding-ink: #572b35; --wedding-gold: #a5874e; --wedding-rule: #dac9aa;
+  box-sizing: border-box; width: 100%; max-width: 186mm;
+  margin: 0 auto; padding: 26px 34px; color: var(--wedding-ink);
+  background: #fffaf0; font: 14px/1.5 Georgia, 'Palatino Linotype', 'DejaVu Serif', serif;
+  overflow-wrap: anywhere; word-break: normal;
+  box-shadow: 0 10px 35px #4933211c;
+}
+.wedding-invoice *, .wedding-invoice *::before, .wedding-invoice *::after { box-sizing: border-box; min-width: 0; }
+.wedding-invoice p { margin: 5px 0; }
+.wedding-heading { position: relative; }
+.wedding-heading h1 { font-weight: normal; line-height: 1.13; margin: 10px 0; }
+.wedding-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .2em; }
+.wedding-subtitle { font-size: 12px; font-style: italic; }
+.wedding-document-label { font-size: 10px; margin: 14px 0 !important; }
+.wedding-document-label strong { display: block; font-size: 15px; font-weight: normal; margin-top: 5px; }
+.wedding-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 12px 0; }
+.wedding-invoice dt { font-size: 9px; text-transform: uppercase; letter-spacing: .09em; }
+.wedding-invoice dd { margin: 4px 0 0; font-weight: normal; }
+.wedding-parties { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 26px; padding: 18px 0; }
+.wedding-invoice h2 { font-size: 12px; font-weight: normal; letter-spacing: .025em; margin: 0 0 9px; }
+.wedding-label { font: 8px/1.5 Georgia, serif; text-transform: uppercase; letter-spacing: .1em; display: block; color: #886c63; }
+.wedding-text { white-space: pre-wrap; }
+.wedding-items { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: inherit; }
+.wedding-col-number { width: 7%; }
+.wedding-col-amount { width: 28%; }
+.wedding-items th { font-weight: normal; font-size: 9px; letter-spacing: .1em; }
+.wedding-items th, .wedding-items td { border-bottom: 1px solid var(--wedding-rule); padding: 8px 6px; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wedding-items th:last-child, .wedding-items td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.wedding-settlement { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 26px; padding: 18px 0; }
+.wedding-accounting h2 { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.wedding-totals { margin: 0; }
+.wedding-totals > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 4px 0; }
+.wedding-totals dt { font-size: 12px; text-transform: none; letter-spacing: normal; }
+.wedding-totals dd { text-align: right; margin: 0; font-variant-numeric: tabular-nums; }
+.wedding-grand-total { margin: 0; }
+.wedding-grand-total dd { font-variant-numeric: tabular-nums; }
+.wedding-closing { padding: 14px 0 0; }
+.wedding-closing .wedding-label { display: inline; margin-right: 6px; }
+.wedding-contacts { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 16px; }
+.wedding-contact-note, .wedding-jurisdiction { font-size: 9px; }
+.wedding-jurisdiction { margin-top: 12px !important; white-space: pre-wrap; }
+.wedding-farewell { font-size: 12px; font-style: italic; }
+
+/* ROYAL CELEBRATION: symmetrical invitation, gilded arch, engraved corner florals. */
+.wedding-elegant { border: 4px double var(--wedding-gold); }
+.wedding-elegant .wedding-heading { text-align: center; padding-top: 4px; }
+.wedding-elegant .wedding-heading::before, .wedding-elegant .wedding-heading::after {
+  content: ''; position: absolute; width: 132px; height: 164px; top: -18px;
+  background: url('wedding-royal.svg') top left / contain no-repeat; pointer-events: none;
+}
+.wedding-elegant .wedding-heading::before { left: -22px; }
+.wedding-elegant .wedding-heading::after { right: -22px; transform: scaleX(-1); }
+.wedding-arch {
+  position: relative; width: min(100%, 360px); margin: 0 auto;
+  border: 1px solid var(--wedding-gold); border-radius: 50% 50% 2px 2px / 38% 38% 0 0;
+  padding: 34px 26px 20px;
+  background: linear-gradient(180deg, #f7ecd63b, transparent);
+}
+.wedding-arch::before { content: ''; position: absolute; inset: 5px; border: 1px solid #a5874e55; border-radius: inherit; pointer-events: none; }
+.wedding-emblem { height: 22px; display: flex; justify-content: center; align-items: center; padding-left: 9px; margin-bottom: 8px; }
+.wedding-emblem i { display: block; width: 22px; height: 22px; border: 1px solid var(--wedding-gold); border-radius: 50%; margin-left: -9px; transform: rotate(-25deg); }
+.wedding-emblem i::before { content: ''; display: block; width: 6px; height: 5px; border: 1px solid var(--wedding-gold); margin: -5px auto 0; transform: rotate(45deg); background: #fffaf0; }
+.wedding-elegant h1 { font-size: 31px; color: #68283b; }
+.wedding-elegant .wedding-kicker { color: #876a35; }
+.wedding-elegant .wedding-subtitle { padding-top: 4px; }
+.wedding-elegant .wedding-document-label { color: #856d49; }
+.wedding-elegant .wedding-document-label strong { color: #68283b; letter-spacing: .06em; }
+.wedding-elegant .wedding-meta { border-block: 1px solid var(--wedding-gold); text-align: center; }
+.wedding-elegant .wedding-parties h2 { color: #8a6d35; font-variant: small-caps; }
+.wedding-elegant .wedding-services h2 { text-align: center; font-style: italic; font-size: 17px; padding: 2px 0 8px; }
+.wedding-elegant .wedding-items th { background: #f6eddc; color: #775e30; border-top: 1px solid var(--wedding-rule); }
+.wedding-elegant .wedding-items td { border-bottom: 1px solid #e5d7c0; }
+.wedding-elegant .wedding-accounting { grid-column: 2; }
+.wedding-settlement-note { grid-column: 1; grid-row: 1 / span 2; align-self: center; text-align: center; font-style: italic; color: #8c7041; }
+.wedding-settlement-note > span { font-size: 30px; }
+.wedding-settlement-note p { font-size: 17px; }
+.wedding-elegant .wedding-grand-total { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-block: 1px solid var(--wedding-gold); }
+.wedding-elegant .wedding-grand-total dt { font-size: 13px; text-transform: none; letter-spacing: .01em; }
+.wedding-elegant .wedding-grand-total dd { text-align: right; margin: 0; font-size: 21px; }
+.wedding-elegant .wedding-closing { border-top: 1px solid var(--wedding-rule); text-align: center; }
+.wedding-elegant .wedding-closing h2 { font-variant: small-caps; letter-spacing: .12em; color: #80622f; }
+.wedding-elegant .wedding-farewell { margin-top: 12px; }
+
+/* CREATIVITY WEDS HAPPINESS: editorial invitation, peach arch & illustrated bouquet. */
+.wedding-playful { --wedding-ink: #674743; --wedding-gold: #b39261; --wedding-rule: #e4cbb9; background: #fff8f3; border: 1px solid #dcbfa5; }
+.wedding-playful .wedding-heading { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: center; gap: 0 20px; padding: 10px 8px 0; }
+.wedding-invite-copy { padding: 12px 0; }
+.wedding-playful .wedding-kicker { color: #997358; font-size: 9px; letter-spacing: .12em; }
+.wedding-playful h1 { color: #925657; font-size: 45px; margin: 16px 0; }
+.wedding-playful h1 span { display: block; }
+.wedding-playful h1 em { display: block; font-size: 14px; line-height: 1.8; letter-spacing: .22em; font-style: normal; text-transform: uppercase; color: #b08b5d; margin: 3px 0; }
+.wedding-playful .wedding-subtitle { max-width: 240px; font-size: 12px; }
+.wedding-tax-family { font-size: 9px; letter-spacing: .02em; color: #96755c; }
+.wedding-vignette { position: relative; min-height: 245px; align-self: stretch; border: 1px solid #d6b993; border-radius: 48% 48% 3px 3px / 30% 30% 0 0; background: #f6e3d6; }
+.wedding-vignette::before { content: ''; position: absolute; inset: -9px -18px 22px; background: url('wedding-bouquet.svg') center / contain no-repeat; pointer-events: none; }
+.wedding-playful .wedding-document-label { grid-column: 1 / -1; text-align: left; border-bottom: 1px solid var(--wedding-rule); padding: 4px 0 13px; }
+.wedding-playful .wedding-document-label strong { display: inline; margin-left: 5px; color: #925657; }
+.wedding-playful .wedding-meta { background: #f7e9df; border-radius: 3px; padding: 12px; gap: 10px; }
+.wedding-playful .wedding-parties > div { padding-left: 12px; border-left: 2px solid #e2b4a3; }
+.wedding-playful .wedding-parties h2 { color: #925657; }
+.wedding-playful .wedding-services h2 { font-style: italic; font-size: 21px; padding: 6px 0; }
+.wedding-playful .wedding-items th { background: transparent; color: #967153; border-block: 1px solid var(--wedding-rule); }
+.wedding-playful .wedding-items td { border-bottom: 1px solid #efdfd3; }
+.wedding-playful .wedding-accounting { align-self: center; padding: 0 8px; }
+.wedding-playful .wedding-grand-total { align-self: center; text-align: center; padding: 20px 16px; background: #f4e1d5; border: 1px solid #dcc1a0; border-radius: 42% 42% 3px 3px / 28% 28% 0 0; }
+.wedding-playful .wedding-grand-total dt { font-size: 11px; letter-spacing: .02em; line-height: 1.5; text-transform: none; }
+.wedding-playful .wedding-grand-total dd { font-size: 31px; margin-top: 8px; color: #925657; }
+.wedding-playful .wedding-closing { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 12px 22px; align-items: center; border-top: 1px solid var(--wedding-rule); }
+.wedding-playful .wedding-rsvp h2 { font-size: 14px; color: #925657; }
+.wedding-playful .wedding-contacts { display: block; }
+.wedding-playful .wedding-farewell { font-size: 20px; line-height: 1.4; color: #a27665; text-align: center; }
+.wedding-playful .wedding-jurisdiction { grid-column: 1 / -1; }
+
+@media (max-width: 600px) {
+  .invoice-preview-canvas { padding: 6px; }
+  .wedding-invoice { padding: 14px; font-size: 12px; }
+  .wedding-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wedding-parties { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .wedding-items th, .wedding-items td { padding: 8px 4px; }
+  .invoice-item-editor { grid-template-columns: minmax(0, 1fr); }
+  .wedding-elegant .wedding-heading::before, .wedding-elegant .wedding-heading::after { width: 70px; height: 100px; opacity: .5; top: -8px; }
+  .wedding-elegant .wedding-heading::before { left: -10px; }
+  .wedding-elegant .wedding-heading::after { right: -10px; }
+  .wedding-arch { padding: 32px 18px 16px; }
+  .wedding-elegant h1 { font-size: 27px; }
+  .wedding-playful .wedding-heading { gap: 0 12px; padding: 0; }
+  .wedding-playful h1 { font-size: clamp(23px, 6.6vw, 36px); }
+  .wedding-playful .wedding-kicker { font-size: 7px; }
+  .wedding-vignette { min-height: 210px; }
+  .wedding-vignette::before { inset: 0 -6px 28px; }
+  .wedding-settlement { gap: 12px; }
+  .wedding-settlement-note p { font-size: 13px; }
+  .wedding-playful .wedding-grand-total { padding: 16px 8px; }
+  .wedding-playful .wedding-grand-total dd { font-size: 22px; }
+  .wedding-playful .wedding-closing { grid-template-columns: minmax(0, 1fr); }
+  .wedding-playful .wedding-farewell { font-size: 17px; text-align: left; }
+}
+@page wedding { size: A4 portrait; margin: 12mm; }
+@media print {
+  .print-area[data-template="wedding"] { page: wedding; }
+  .print-area > .wedding-invoice {
+    page: wedding; max-width: none; width: 100%; padding: 5mm 6mm;
+    font-size: 9pt; line-height: 1.4; box-shadow: none; margin: 0;
+    overflow: visible; height: auto; max-height: none;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  .wedding-invoice p { margin: 3px 0; }
+  .wedding-meta { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-block: 9px; }
+  .wedding-parties { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 12px 0; }
+  .wedding-items th, .wedding-items td { padding: 6px; }
+  .wedding-settlement { padding: 12px 0; gap: 8px 22px; }
+  .wedding-totals > div { padding: 3px 0; }
+  .wedding-closing { padding-top: 12px; }
+  .wedding-elegant h1 { font-size: 24pt; }
+  .wedding-arch { width: 94mm; padding: 26px 26px 16px; }
+  .wedding-elegant .wedding-heading::before, .wedding-elegant .wedding-heading::after { width: 36mm; height: 42mm; opacity: 1; }
+  .wedding-elegant .wedding-heading::before { left: -3mm; }
+  .wedding-elegant .wedding-heading::after { right: -3mm; }
+  .wedding-document-label { margin: 10px 0 !important; }
+  .wedding-elegant .wedding-grand-total { padding: 7px 0; }
+  .wedding-playful h1 { font-size: 33pt; }
+  .wedding-playful .wedding-vignette { min-height: 230px; }
+  .wedding-playful .wedding-grand-total { padding: 16px 12px; }
+  .wedding-playful .wedding-closing { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+  .wedding-playful .wedding-farewell { font-size: 15pt; }
+  .wedding-items thead { display: table-header-group; }
+  .wedding-items tr { break-inside: avoid; }
+  .wedding-heading, .wedding-meta, .wedding-accounting, .wedding-grand-total, .wedding-closing { break-inside: avoid; }
+  .wedding-services, .wedding-items, .wedding-invoice { break-inside: auto; }
+}

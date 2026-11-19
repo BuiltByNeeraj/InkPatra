@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bill Book - Cheque Style &amp; SQLite Record System</title>
 <link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="invoice-templates.css" />
+<link rel="stylesheet" href="funeral-templates.css" />
 </head>
 <body>
 <header class="topbar">
@@ -29,6 +31,7 @@
     <div class="toolbar">
       <h2>Cheque Book Leaves</h2>
       <div class="toolbar-actions">
+        <button id="btn-preview-current" class="btn ghost">Preview Last Invoice</button>
         <button id="btn-print-current" class="btn ghost">Print Last Cheque</button>
         <button id="btn-issue" class="btn primary">Issue New Cheque-Bill</button>
       </div>
@@ -340,6 +343,50 @@
   </div>
 </div>
 
+<!-- Template preview: presentation choices never alter financial records. -->
+<div class="overlay" id="invoice-preview-overlay" hidden>
+  <div class="modal invoice-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-preview-title">
+    <div class="modal-header">
+      <h3 id="invoice-preview-title">Invoice Preview</h3>
+      <button type="button" id="btn-close-invoice-preview" class="btn-close" aria-label="Close invoice preview">&times;</button>
+    </div>
+    <div class="invoice-preview-toolbar">
+      <label>Template
+        <select id="invoice-template"><option value="cheque">Cheque Style</option><option value="wedding">Wedding Invitation</option><option value="funeral">Funeral Farewell</option></select>
+      </label>
+      <label id="wedding-mode-field" hidden>Wedding mode
+        <select id="wedding-mode"><option value="elegant">Elegant</option><option value="playful">Playful</option></select>
+      </label>
+      <label id="funeral-mode-field" hidden>Funeral mode
+        <select id="funeral-mode"><option value="respectful">Respectful Farewell</option><option value="dark">Dark Humor — Novelty (opt-in)</option></select>
+      </label>
+      <button type="button" id="btn-preview-print" class="btn primary">Print / Save as PDF</button>
+    </div>
+    <p class="hint">Template changes affect presentation only. Cheque Style is the default. Printing uses saved details.</p>
+    <p id="funeral-novelty-note" class="funeral-opt-in-note" role="note" hidden>Dark Humor is a novelty template, not recommended for grieving customers. Your opt-in applies only to this open invoice preview.</p>
+    <p id="funeral-tax-review" class="funeral-tax-review" role="note" hidden><strong>Funeral-service exemption check — separate compliance review required.</strong> Confirm whether an exemption applies to the services billed before issuing or printing. This template preserves existing GST selections and amounts; it does not determine taxability or apply an exemption.</p>
+    <details class="invoice-details" id="invoice-details-editor" hidden>
+      <summary id="invoice-details-summary">Recipient, RSVP contacts &amp; itemisation</summary>
+      <form class="form" id="form-invoice-details">
+        <p class="hint">Optional details for this invoice. Items must add up to its saved taxable value: <strong id="invoice-saved-taxable"></strong>. This editor cannot change financial amounts or GST.</p>
+        <label>Recipient address<textarea id="invoice-recipient_address" rows="3"></textarea></label>
+        <div class="row">
+          <label>Seller mobile<input id="invoice-seller_mobile" type="tel" autocomplete="tel" /></label>
+          <label>Seller email<input id="invoice-seller_email" type="email" autocomplete="email" /></label>
+          <label>Seller website<input id="invoice-seller_website" type="text" placeholder="www.example.com" /></label>
+        </div>
+        <div id="invoice-items-editor"></div>
+        <div class="form-actions">
+          <button type="button" id="btn-add-invoice-item" class="btn ghost">Add item</button>
+          <button type="submit" class="btn primary">Save presentation details</button>
+        </div>
+        <p id="invoice-details-feedback" class="invoice-preview-message" role="status"></p>
+      </form>
+    </details>
+    <div id="invoice-preview-content" class="invoice-preview-canvas"></div>
+  </div>
+</div>
+
 <!-- ============ REAL CHEQUE PRINT AREA ============ -->
 <div class="print-area" id="print-area" hidden></div>
 
@@ -348,6 +395,9 @@
 </footer>
 
 <script src="sqlite-engine.js"></script>
+<script src="invoice-templates.js"></script>
+<script src="funeral-templates.js"></script>
+<script src="invoice-preview.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
